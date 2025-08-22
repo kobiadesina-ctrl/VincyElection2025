@@ -119,8 +119,7 @@ function onDistrictMove(e, el){
 // Tooltip renderer (4 columns + logos)
 // --------------------
 function renderTooltipFor(districtId){
-  // Try to find an exact match first. If none, fall back to whatever ID we got.
-  const info = state.districts[districtId] || state.districts[(state.districts[districtId]?.name)] || null;
+  const info = state.districts[districtId];
 
   if(!info){
     tooltip.innerHTML = '<div class="district-name">No data</div><div style="color:var(--muted)">No results yet.</div>';
@@ -358,21 +357,21 @@ function bindUI(){
 }
 
 // --------------------
-// Tooltip table CSS helpers (only affect tooltip markup)
-// (These classes are referenced in CSS you added or can be styled globally.)
-// --------------------
-// NOTE: Visual styling is primarily in style.css; the structure here matches:
-// .tt-header/.tt-row grid with 4 columns; .party-logo sized by CSS to 1em.
-
-// --------------------
 // Init
 // --------------------
 document.addEventListener('DOMContentLoaded', ()=>{
   bindUI();
-  // Optionally, if you embed a default <svg> in the page, we will pick it up
-  // via loadSVG. Otherwise, wait for upload.
+
+  // 1) Use inline <svg> if present
   const inlineSVG = svgWrapper.querySelector('svg');
-  if(inlineSVG){
+  if (inlineSVG) {
     loadSVG(inlineSVG.outerHTML);
+    return;
   }
+
+  // 2) Otherwise, auto-load default map.svg from same folder
+  fetch('map.svg', { cache: 'no-store' })
+    .then(res => res.ok ? res.text() : null)
+    .then(text => { if (text) loadSVG(text); })
+    .catch(() => {/* user can upload manually */});
 });
