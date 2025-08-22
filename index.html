@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Interactive Election Map – Live Update</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Interactive Election Map — Admin view</h1>
+      <div class="controls">
+        <input id="svg-file" type="file" accept="image/svg+xml" />
+        <button class="btn" id="reset-map">Reset Map</button>
+      </div>
+    </header>
+
+    <section class="top-widgets" style="margin-top:14px">
+      <div id="popular-vote" class="card" style="padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <strong>Popular Vote</strong>
+          <small id="pv-total" style="color:var(--muted)">0 votes</small>
+        </div>
+        <div class="pv-bar" id="pv-bar"></div>
+      </div>
+
+      <div id="seats-wrap" class="card" style="padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <strong>Seats (of 15)</strong>
+        <svg id="seats" viewBox="0 0 260 80" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="seat-summary" style="margin-top:6px;font-size:13px;color:var(--muted)">0 / 15 decided</div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <div id="map-area" class="card">
+        <div id="svg-wrapper">
+          <!-- Example placeholder SVG -->
+          <svg id="example-map" xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520">
+            <g id="districts">
+              <path id="d-1" data-district="d-1" d="M100,80 L220,80 L220,200 L100,200 Z" fill="#ddd" stroke="transparent" stroke-width="1"></path>
+              <path id="d-2" data-district="d-2" d="M230,80 L350,80 L350,200 L230,200 Z" fill="#ddd" stroke="transparent" stroke-width="1"></path>
+              <path id="d-3" data-district="d-3" d="M100,220 L220,220 L220,340 L100,340 Z" fill="#ddd" stroke="transparent" stroke-width="1"></path>
+              <path id="d-4" data-district="d-4" d="M230,220 L350,220 L350,340 L230,340 Z" fill="#ddd" stroke="transparent" stroke-width="1"></path>
+            </g>
+            <g fill="#222" font-size="12">
+              <text x="160" y="140" text-anchor="middle">District 1</text>
+              <text x="290" y="140" text-anchor="middle">District 2</text>
+              <text x="160" y="280" text-anchor="middle">District 3</text>
+              <text x="290" y="280" text-anchor="middle">District 4</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <aside class="right">
+        <div class="card">
+          <label>Results JSON (paste and press Apply)</label>
+          <textarea id="results-json">{
+  "parties": {
+    "Alpha": {"color":"#1f77b4"},
+    "Beta": {"color":"#ff7f0e"},
+    "Gamma": {"color":"#2ca02c"}
+  },
+  "districts": {
+    "d-1": {
+      "name":"District 1",
+      "candidates":[{"name":"Alice","party":"Alpha","votes":1200},{"name":"Bob","party":"Beta","votes":800}],
+      "totalVotes":2000
+    },
+    "d-2": {
+      "name":"District 2",
+      "candidates":[{"name":"Carol","party":"Gamma","votes":500},{"name":"Dave","party":"Alpha","votes":1500}],
+      "totalVotes":2000
+    }
+  }
+}
+</textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" id="apply-results">Apply</button>
+            <button class="btn secondary" id="clear-results">Clear</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <label>Quick controls</label>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="small" id="randomize">Randomize colors</button>
+            <button class="small" id="export-json">Export JSON</button>
+          </div>
+          <p style="margin-top:10px;color:var(--muted);font-size:13px">
+            Tip: keep district element IDs in your SVG like <code>id="d-1"</code> or set <code>data-district</code>.
+          </p>
+        </div>
+
+        <div class="card">
+          <label>Legend</label>
+          <div id="legend" style="margin-top:8px"></div>
+        </div>
+      </aside>
+    </div>
+
+    <div id="tooltip" class="tooltip" style="display:none"></div>
+
+    <footer>
+      Built for quick admin-driven live updates — paste JSON or upload a properly annotated SVG.
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
