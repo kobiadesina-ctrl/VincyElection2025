@@ -1,12 +1,11 @@
-+37
--27
-
 // ---- Utilities ----
 const qs = s => document.querySelector(s);
 const svgWrapper = qs('#svg-wrapper');
 const tooltip = qs('#tooltip');
 
+// --------------------
 // Global state
+// --------------------
 let state = {
   parties: {
     "Unity Labour Party": { color: "#ed2633" },
@@ -16,7 +15,46 @@ let state = {
   totalSeats: 15
 };
 
-// Attach hover handlers to districts
+// ---- A) Party aliases (short codes) ----
+state.parties["ULP"] = state.parties["Unity Labour Party"];
+state.parties["NDP"] = state.parties["New Democratic Party"];
+
+// ---- B) Candidate roster (NDP vs ULP) ----
+const CANDIDATE_CONFIG = {
+  "North Windward":         { NDP: "Shevern John",         ULP: "Grace Walters"      },
+  "North Central Windward": { NDP: "Chieftain Neptune",    ULP: "Ralph Gonsalves"    },
+  "South Central Windward": { NDP: "Israel Bruce",         ULP: "Saboto Caesar"      },
+  "South Windward":         { NDP: "Andrew John",          ULP: "Daron John"         },
+  "Marriaqua":              { NDP: "Philip Jackson",       ULP: "Jimmy Prince"       },
+  "East St. George":        { NDP: "Laverne Gibson-Velox", ULP: "Camillo Gonsalves"  },
+  "West St. George":        { NDP: "Kaschaka Cupid",       ULP: "Curtis King"        },
+  "East Kingstown":         { NDP: "Fitz Bramble",         ULP: "Luke Browne"        },
+  "Central Kingstown":      { NDP: "St Clair Leacock",     ULP: "Marvin Fraser"      },
+  "West Kingstown":         { NDP: "Daniel Cummings",      ULP: "Keisal Peters"      },
+  "South Leeward":          { NDP: "Nigel Stephenson",     ULP: "Grenville Williams" },
+  "Central Leeward":        { NDP: "Conroy Huggins",       ULP: "Orando Brewster"    },
+  "North Leeward":          { NDP: "Kishore Shallow",      ULP: "Carlos James"       },
+  "Northern Grenadines":    { NDP: "Godwin Friday",        ULP: "Carlos Williams"    },
+  "Southern Grenadines":    { NDP: "Terrance Ollivierre",  ULP: "Chevonne Stewart"   },
+};
+
+function seedCandidates() {
+  Object.entries(CANDIDATE_CONFIG).forEach(([name, pair]) => {
+    state.districts[name] = {
+      name,
+      candidates: [
+        { party: "NDP", name: pair.NDP, votes: 0 },
+        { party: "ULP", name: pair.ULP, votes: 0 }
+      ],
+      totalVotes: 0
+    };
+  });
+}
+seedCandidates();
+
+// --------------------
+// District hookup
+// --------------------
 function attachToDistricts(svgRoot){
   const districts = svgRoot.querySelectorAll('[data-district], path[id^="d-"]');
   districts.forEach(el => {
@@ -27,6 +65,9 @@ function attachToDistricts(svgRoot){
   });
 }
 
+// --------------------
+// SVG loader
+// --------------------
 function loadSVG(svgText){
   svgWrapper.innerHTML = svgText;
   const svg = svgWrapper.querySelector('svg');
@@ -45,6 +86,9 @@ function loadSVG(svgText){
   applyResults();
 }
 
+// --------------------
+// Hover + Tooltip
+// --------------------
 function onDistrictHover(e, el){
   const id = el.getAttribute('data-district') || el.id;
 
@@ -71,35 +115,71 @@ function onDistrictMove(e, el){
   tooltip.style.top = top + 'px';
 }
 
+// --------------------
+// Tooltip renderer (4 columns + logos)
+// --------------------
 function renderTooltipFor(districtId){
-  const info = state.districts[districtId];
+  // Try to find an exact match first. If none, fall back to whatever ID we got.
+  const info = state.districts[districtId] || state.districts[(state.districts[districtId]?.name)] || null;
+
   if(!info){
     tooltip.innerHTML = '<div class="district-name">No data</div><div style="color:var(--muted)">No results yet.</div>';
     return;
   }
+
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
-  const rows = candidates.length
-    ? candidates.map(c=>{
-        const party = c.party || '—';
-        const color = (state.parties[party] && state.parties[party].color) || '#999';
-        const pct = total ? ((c.votes||0)/total*100).toFixed(1) : '0.0';
-        return `<div class="candidate-row">
-                  <div class="candidate-left">
-                    <div class="party-pill" style="background:${color}"></div>
-                    <div>
-                      <div style="font-weight:600">${c.name}</div>
-                      <div style="font-size:12px;color:var(--muted)">${party}</div>
-                    </div>
-                  </div>
-                  <div class="votes">${c.votes || 0} <small style="color:var(--muted)">(${pct}%)</small></div>
-                </div>`;
-      }).join('')
-    : '<div style="color:var(--muted)">No results yet.</div>';
-  tooltip.innerHTML = `<div class="district-name">${info.name || districtId}</div>${rows}<div style="margin-top:8px;color:var(--muted);font-size:12px">Total votes: ${total}</div>`;
+
+  // Map party -> meta (color + logo)
+  const partyMeta = (p) => {
+    const meta = {
+      color: (state.parties[p] && state.parties[p].color) || '#999',
+      short: p,
+      logo: null
+    };
+    if (p === 'NDP') meta.logo = 'NDP logo.png';
+    if (p === 'ULP') meta.logo = 'ULP logo.png';
+    return meta;
+  };
+
+  const rows = candidates.length ? candidates.map(c=>{
+    const meta = partyMeta(c.party || '—');
+    const pct = total ? ((c.votes||0)/total*100).toFixed(1) : '0.0';
+    const logoImg = meta.logo
+      ? `<img class="party-logo" src="${meta.logo}" alt="${c.party} logo" />`
+      : '';
+    return `
+      <div class="tt-row">
+        <div class="tt-col party-cell">
+          <span class="party-chip" style="background:${meta.color}"></span>
+          ${logoImg}
+          <span class="party-name">${meta.short}</span>
+        </div>
+        <div class="tt-col candidate-cell">
+          <span class="candidate-name">${c.name || '—'}</span>
+        </div>
+        <div class="tt-col votes-cell">${c.votes || 0}</div>
+        <div class="tt-col share-cell">${pct}%</div>
+      </div>
+    `;
+  }).join('') : '<div style="color:var(--muted)">No results yet.</div>';
+
+  tooltip.innerHTML = `
+    <div class="district-name">${info.name || districtId}</div>
+    <div class="tt-header">
+      <div class="tt-col">Party</div>
+      <div class="tt-col">Candidate</div>
+      <div class="tt-col">Votes</div>
+      <div class="tt-col">Share</div>
+    </div>
+    ${rows}
+    <div class="tt-total">Total votes: ${total}</div>
+  `;
 }
 
-// Apply results: recolor districts + update widgets
+// --------------------
+// Apply results + widgets
+// --------------------
 function applyResults(){
   const svg = svgWrapper.querySelector('svg');
   if(!svg) return;
@@ -224,37 +304,75 @@ function renderLegend(){
   Object.keys(state.parties).forEach(p=>{
     const color = state.parties[p].color || '#999';
     const row = document.createElement('div');
-    row.style.display = 'flex'; row.style.alignItems='center'; row.style.gap='8px'; row.style.marginBottom='6px';
-    row.innerHTML = `<div style="width:18px;height:12px;background:${color};border-radius:3px"></div><div style="font-weight:600">${p}</div>`;
+    row.style.display = 'flex';
+    row.style.alignItems='center';
+    row.style.gap='8px';
+    row.style.marginBottom='6px';
+
+    const pill = document.createElement('span');
+    pill.style.width='14px';
+    pill.style.height='14px';
+    pill.style.borderRadius='3px';
+    pill.style.display='inline-block';
+    pill.style.background = color;
+
+    const label = document.createElement('span');
+    label.textContent = p;
+
+    row.appendChild(pill);
+    row.appendChild(label);
     legend.appendChild(row);
   });
 }
 
-// Reset button
-qs('#reset-map').addEventListener('click', ()=>{
-  const svg = svgWrapper.querySelector('svg');
-  if(!svg) return;
-  svg.querySelectorAll('[data-district], path[id^="d-"]').forEach(el=>el.setAttribute('fill','#d7d7d7'));
+// --------------------
+// File input + reset
+// --------------------
+function bindUI(){
+  const fileInput = qs('#svg-file');
+  const resetBtn = qs('#reset-map');
+
+  if(fileInput){
+    fileInput.addEventListener('change', (e)=>{
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const text = String(ev.target.result);
+        loadSVG(text);
+      };
+      reader.readAsText(f);
+    });
+  }
+
+  if(resetBtn){
+    resetBtn.addEventListener('click', ()=>{
+      // zero out votes but keep candidates
+      Object.values(state.districts).forEach(d=>{
+        d.totalVotes = 0;
+        (d.candidates||[]).forEach(c=> c.votes = 0);
+      });
+      applyResults();
+    });
+  }
+}
+
+// --------------------
+// Tooltip table CSS helpers (only affect tooltip markup)
+// (These classes are referenced in CSS you added or can be styled globally.)
+// --------------------
+// NOTE: Visual styling is primarily in style.css; the structure here matches:
+// .tt-header/.tt-row grid with 4 columns; .party-logo sized by CSS to 1em.
+
+// --------------------
+// Init
+// --------------------
+document.addEventListener('DOMContentLoaded', ()=>{
+  bindUI();
+  // Optionally, if you embed a default <svg> in the page, we will pick it up
+  // via loadSVG. Otherwise, wait for upload.
+  const inlineSVG = svgWrapper.querySelector('svg');
+  if(inlineSVG){
+    loadSVG(inlineSVG.outerHTML);
+  }
 });
-
-// Upload SVG
-qs('#svg-file').addEventListener('change', (e)=>{
-  const f = e.target.files[0];
-  if(!f) return;
-  const reader = new FileReader();
-  reader.onload = ev => loadSVG(ev.target.result);
-  reader.readAsText(f);
-});
-
-
-// On load
-window.addEventListener('DOMContentLoaded', ()=>{
-  fetch('map.svg')
-    .then(r => r.text())
-    .then(loadSVG)
-    .catch(err => console.error("Could not load map.svg", err));
-});
-
-
-
-
