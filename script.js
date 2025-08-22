@@ -130,40 +130,71 @@ function renderPopularVote(){
 
 // Seats widget
 function renderSeats(){
-  const seatCounts = {};
-  Object.values(state.districts).forEach(d=>{
-    if(d && d.candidates && d.candidates.length){
-      const winner = d.candidates.slice().sort((a,b)=> (b.votes||0) - (a.votes||0))[0];
-      if(winner && winner.party){
-        seatCounts[winner.party] = (seatCounts[winner.party]||0) + 1;
-      }
-    }
-  });
   const svg = qs('#seats'); svg.innerHTML = '';
   const total = state.totalSeats || 15;
-  const seats = new Array(total).fill({color:'#d7d7d7'});
-  let seatList = [];
-  Object.keys(state.parties).forEach(p=>{
-    const n = seatCounts[p]||0;
-    for(let i=0;i<n;i++) seatList.push(p);
+
+  // build seat data with winner info and lead margin
+  const districts = Object.entries(state.districts)
+    .sort((a,b)=> (a[1].name||a[0]).localeCompare(b[1].name||b[0]));
+  const seatData = [];
+  districts.forEach(([id,d])=>{
+    if(d && d.candidates && d.candidates.length){
+      const sorted = d.candidates.slice().sort((a,b)=> (b.votes||0) - (a.votes||0));
+      const winner = sorted[0];
+      const runner = sorted[1] || {votes:0};
+      seatData.push({
+        color: (state.parties[winner.party] && state.parties[winner.party].color) || '#999',
+        district: d.name || id,
+        party: winner.party,
+        lead: (winner.votes||0) - (runner.votes||0)
+      });
+    } else {
+      seatData.push({
+        color: '#d7d7d7',
+        district: d && d.name ? d.name : id
+      });
+    }
   });
-  for(let i=0;i<seatList.length && i<total;i++){
-    const p = seatList[i]; seats[i] = {color: state.parties[p].color || '#999'};
+  while(seatData.length < total) seatData.push({color:'#d7d7d7'});
+  const decided = seatData.filter(s=>s.party).length;
+
+  // arrange seats in semicircle: rows 5-4-3-2-1
+  const rows = [5,4,3,2,1];
+  const radius = 10;
+  const centerX = 130;
+  const spacingX = 20;
+  const spacingY = 14;
+  const startY = radius + (rows.length-1)*spacingY;
+  let idx = 0;
+  for(let r=0;r<rows.length && idx<total;r++){
+    const n = rows[r];
+    const y = startY - r*spacingY;
+    for(let i=0;i<n && idx<total;i++,idx++){
+      const seat = seatData[idx];
+      const x = centerX + (i - (n-1)/2)*spacingX;
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', x);
+      c.setAttribute('cy', y);
+      c.setAttribute('r', radius);
+      c.setAttribute('fill', seat.color);
+      c.setAttribute('stroke', '#fff');
+      if(seat.district){
+        c.style.cursor = 'pointer';
+        c.addEventListener('mouseenter', e=>{
+          const text = seat.party
+            ? `<div class="district-name">${seat.district}</div>${seat.party} +${seat.lead} votes`
+            : `<div class="district-name">${seat.district}</div><div style="color:var(--muted)">No results</div>`;
+          tooltip.innerHTML = text;
+          tooltip.style.display = 'block';
+          onDistrictMove(e);
+        });
+        c.addEventListener('mousemove', e=>onDistrictMove(e));
+        c.addEventListener('mouseleave', ()=>{ tooltip.style.display='none'; });
+      }
+      svg.appendChild(c);
+    }
   }
-  const segW = 12, gap = 3, startX = 10, startY = 14;
-  for(let i=0;i<total;i++){
-    const g = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    g.setAttribute('x', startX + i*(segW+gap));
-    g.setAttribute('y', startY);
-    g.setAttribute('width', segW);
-    g.setAttribute('height', segW);
-    g.setAttribute('rx', 2);
-    g.setAttribute('ry', 2);
-    g.setAttribute('fill', seats[i].color);
-    g.setAttribute('stroke', '#fff');
-    svg.appendChild(g);
-  }
-  qs('#seat-summary').textContent = seatList.length + ' / ' + total + ' decided';
+  qs('#seat-summary').textContent = decided + ' / ' + total + ' decided';
 }
 
 // Legend
@@ -209,6 +240,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
     })
     .catch(err => console.error("Could not load map.svg", err));
 });
+
 
 
 
