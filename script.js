@@ -1,3 +1,6 @@
++37
+-27
+
 // ---- Utilities ----
 const qs = s => document.querySelector(s);
 const svgWrapper = qs('#svg-wrapper');
@@ -22,6 +25,24 @@ function attachToDistricts(svgRoot){
     el.addEventListener('mouseleave', e => onDistrictOut(e, el));
     el.addEventListener('mousemove', e => onDistrictMove(e, el));
   });
+}
+
+function loadSVG(svgText){
+  svgWrapper.innerHTML = svgText;
+  const svg = svgWrapper.querySelector('svg');
+  if(!svg) return;
+  // make map responsive
+  if(!svg.getAttribute('viewBox')){
+    const w = svg.getAttribute('width');
+    const h = svg.getAttribute('height');
+    if(w && h) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  }
+  svg.removeAttribute('width');
+  svg.removeAttribute('height');
+  svg.style.width = '100%';
+  svg.style.height = 'auto';
+  attachToDistricts(svg);
+  applyResults();
 }
 
 function onDistrictHover(e, el){
@@ -221,23 +242,16 @@ qs('#svg-file').addEventListener('change', (e)=>{
   const f = e.target.files[0];
   if(!f) return;
   const reader = new FileReader();
-  reader.onload = function(ev){
-    svgWrapper.innerHTML = ev.target.result;
-    const svg = svgWrapper.querySelector('svg');
-    if(svg){ attachToDistricts(svg); applyResults(); }
-  }
+  reader.onload = ev => loadSVG(ev.target.result);
   reader.readAsText(f);
 });
+
 
 // On load
 window.addEventListener('DOMContentLoaded', ()=>{
   fetch('map.svg')
     .then(r => r.text())
-    .then(svgText => {
-      svgWrapper.innerHTML = svgText;
-      const svg = svgWrapper.querySelector('svg');
-      if(svg){ attachToDistricts(svg); applyResults(); }
-    })
+    .then(loadSVG)
     .catch(err => console.error("Could not load map.svg", err));
 });
 
