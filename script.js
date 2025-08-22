@@ -1,17 +1,20 @@
 // ---- Utilities ----
 const qs = s => document.querySelector(s);
-const qsa = s => Array.from(document.querySelectorAll(s));
+const svgWrapper = qs('#svg-wrapper');
+const tooltip = qs('#tooltip');
 
+// Global state
 let state = {
-  parties: {},
+  parties: {
+    "Alpha": { color: "#1f77b4" },
+    "Beta": { color: "#ff7f0e" },
+    "Gamma": { color: "#2ca02c" }
+  },
   districts: {},
   totalSeats: 15
 };
 
-const svgWrapper = qs('#svg-wrapper');
-const tooltip = qs('#tooltip');
-
-// attach hover handlers
+// Attach hover handlers to districts
 function attachToDistricts(svgRoot){
   const districts = svgRoot.querySelectorAll('[data-district], path[id^="d-"]');
   districts.forEach(el => {
@@ -30,7 +33,6 @@ function onDistrictHover(e, el){
   onDistrictMove(e, el);
 }
 function onDistrictOut(e, el){
-  const id = el.getAttribute('data-district') || el.id;
   el.classList.remove('district-hover');
   tooltip.style.display = 'none';
 }
@@ -48,7 +50,7 @@ function onDistrictMove(e, el){
 function renderTooltipFor(districtId){
   const info = state.districts[districtId];
   if(!info){
-    tooltip.innerHTML = '<div class="district-name">No data</div><div style="color:var(--muted)">No results for this district yet.</div>';
+    tooltip.innerHTML = '<div class="district-name">No data</div><div style="color:var(--muted)">No results yet.</div>';
     return;
   }
   const total = info.totalVotes || info.candidates.reduce((s,c)=>s+(c.votes||0),0);
@@ -56,12 +58,21 @@ function renderTooltipFor(districtId){
     const party = c.party || '—';
     const color = (state.parties[party] && state.parties[party].color) || '#999';
     const pct = total ? ((c.votes||0)/total*100).toFixed(1) : '0.0';
-    return `<div class="candidate-row"><div class="candidate-left"><div class="party-pill" style="background:${color}"></div><div><div style="font-weight:600">${c.name}</div><div style="font-size:12px;color:var(--muted)">${party}</div></div></div><div class="votes">${c.votes || 0} <small style="color:var(--muted)">(${pct}%)</small></div></div>`;
+    return `<div class="candidate-row">
+              <div class="candidate-left">
+                <div class="party-pill" style="background:${color}"></div>
+                <div>
+                  <div style="font-weight:600">${c.name}</div>
+                  <div style="font-size:12px;color:var(--muted)">${party}</div>
+                </div>
+              </div>
+              <div class="votes">${c.votes || 0} <small style="color:var(--muted)">(${pct}%)</small></div>
+            </div>`;
   }).join('');
-  tooltip.innerHTML = `<div class="district-name">${info.name || districtId}</div>`+rows+`<div style="margin-top:8px;color:var(--muted);font-size:12px">Total votes: ${total}</div>`;
+  tooltip.innerHTML = `<div class="district-name">${info.name || districtId}</div>${rows}<div style="margin-top:8px;color:var(--muted);font-size:12px">Total votes: ${total}</div>`;
 }
 
-// Apply results
+// Apply results: recolor districts + update widgets
 function applyResults(){
   const svg = svgWrapper.querySelector('svg');
   if(!svg) return;
@@ -70,8 +81,7 @@ function applyResults(){
     const id = el.getAttribute('data-district') || el.id;
     const info = state.districts[id];
     if(info && info.candidates && info.candidates.length){
-      const sorted = info.candidates.slice().sort((a,b)=> (b.votes||0) - (a.votes||0));
-      const winner = sorted[0];
+      const winner = info.candidates.slice().sort((a,b)=> (b.votes||0) - (a.votes||0))[0];
       const color = (state.parties[winner.party] && state.parties[winner.party].color) || '#999';
       el.setAttribute('fill', color);
     } else {
@@ -85,6 +95,7 @@ function applyResults(){
   renderLegend();
 }
 
+// Popular vote bar
 function renderPopularVote(){
   const partyTotals = {};
   let totalVotes = 0;
@@ -95,8 +106,7 @@ function renderPopularVote(){
     });
   });
   const pvBar = qs('#pv-bar'); pvBar.innerHTML = '';
-  const parties = Object.keys(state.parties || {});
-  parties.forEach(p=>{
+  Object.keys(state.parties).forEach(p=>{
     const v = partyTotals[p] || 0;
     const w = totalVotes ? (v/totalVotes*100) : 0;
     if(w>0){
@@ -112,20 +122,17 @@ function renderPopularVote(){
   qs('#pv-total').textContent = totalVotes + ' votes';
 }
 
+// Seats widget
 function renderSeats(){
   const seatCounts = {};
-  let decided = 0;
-  Object.entries(state.districts).forEach(([id,d])=>{
+  Object.values(state.districts).forEach(d=>{
     if(d && d.candidates && d.candidates.length){
-      const sorted = d.candidates.slice().sort((a,b)=> (b.votes||0) - (a.votes||0));
-      const winner = sorted[0];
+      const winner = d.candidates.slice().sort((a,b)=> (b.votes||0) - (a.votes||0))[0];
       if(winner && winner.party){
         seatCounts[winner.party] = (seatCounts[winner.party]||0) + 1;
-        decided++;
       }
     }
   });
-
   const svg = qs('#seats'); svg.innerHTML = '';
   const total = state.totalSeats || 15;
   const seats = new Array(total).fill({color:'#d7d7d7'});
@@ -135,7 +142,7 @@ function renderSeats(){
     for(let i=0;i<n;i++) seatList.push(p);
   });
   for(let i=0;i<seatList.length && i<total;i++){
-    const p = seatList[i]; seats[i] = {color: state.parties[p].color || '#999', party:p};
+    const p = seatList[i]; seats[i] = {color: state.parties[p].color || '#999'};
   }
   const segW = 12, gap = 3, startX = 10, startY = 14;
   for(let i=0;i<total;i++){
@@ -150,10 +157,10 @@ function renderSeats(){
     g.setAttribute('stroke', '#fff');
     svg.appendChild(g);
   }
-
-  qs('#seat-summary').textContent = (seatList.length) + ' / ' + total + ' decided';
+  qs('#seat-summary').textContent = seatList.length + ' / ' + total + ' decided';
 }
 
+// Legend
 function renderLegend(){
   const legend = qs('#legend'); legend.innerHTML = '';
   Object.keys(state.parties).forEach(p=>{
@@ -165,26 +172,29 @@ function renderLegend(){
   });
 }
 
-// Event listeners
-qs('#apply-results').addEventListener('click', ()=>{
-  try{
-    const parsed = JSON.parse(qs('#results-json').value);
-    state.parties = parsed.parties || {};
-    state.districts = parsed.districts || {};
-    if(parsed.totalSeats) state.totalSeats = parsed.totalSeats;
-    applyResults();
-    alert('Results applied');
-  }catch(err){ alert('Invalid JSON — '+err.message); }
+// Reset button
+qs('#reset-map').addEventListener('click', ()=>{
+  const svg = svgWrapper.querySelector('svg');
+  if(!svg) return;
+  svg.querySelectorAll('[data-district], path[id^="d-"]').forEach(el=>el.setAttribute('fill','#d7d7d7'));
 });
 
-qs('#clear-results').addEventListener('click', ()=>{
-  state = {parties:{},districts:{},totalSeats:15};
-  qs('#results-json').value = '';
+// Upload SVG
+qs('#svg-file').addEventListener('change', (e)=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    svgWrapper.innerHTML = ev.target.result;
+    const svg = svgWrapper.querySelector('svg');
+    if(svg){ attachToDistricts(svg); applyResults(); }
+  }
+  reader.readAsText(f);
+});
+
+// On load
+window.addEventListener('DOMContentLoaded', ()=>{
+  const svg = svgWrapper.querySelector('svg');
+  attachToDistricts(svg);
   applyResults();
 });
-
-qs('#export-json').addEventListener('click', ()=>{
-  const data = JSON.stringify(state, null, 2);
-  const blob = new Blob([data], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'election-results.json'; a.click(); URL.revoke
