@@ -6,9 +6,8 @@ const tooltip = qs('#tooltip');
 // Global state
 let state = {
   parties: {
-    "Alpha": { color: "#1f77b4" },
-    "Beta": { color: "#ff7f0e" },
-    "Gamma": { color: "#2ca02c" }
+    "Unity Labour Party": { color: "#ed2633" },
+    "New Democratic Party": { color: "#f5c02c" },
   },
   districts: {},
   totalSeats: 15
@@ -203,3 +202,4 @@ window.addEventListener('DOMContentLoaded', ()=>{
     })
     .catch(err => console.error("Could not load map.svg", err));
 });
+
