@@ -194,7 +194,12 @@ qs('#svg-file').addEventListener('change', (e)=>{
 
 // On load
 window.addEventListener('DOMContentLoaded', ()=>{
-  const svg = svgWrapper.querySelector('svg');
-  attachToDistricts(svg);
-  applyResults();
+  fetch('map.svg')
+    .then(r => r.text())
+    .then(svgText => {
+      svgWrapper.innerHTML = svgText;
+      const svg = svgWrapper.querySelector('svg');
+      if(svg){ attachToDistricts(svg); applyResults(); }
+    })
+    .catch(err => console.error("Could not load map.svg", err));
 });
