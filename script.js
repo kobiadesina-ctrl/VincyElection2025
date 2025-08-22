@@ -26,6 +26,10 @@ function attachToDistricts(svgRoot){
 
 function onDistrictHover(e, el){
   const id = el.getAttribute('data-district') || el.id;
+
+  // bring to front
+  el.parentNode.appendChild(el);
+
   el.classList.add('district-hover');
   renderTooltipFor(id);
   tooltip.style.display = 'block';
@@ -202,4 +206,5 @@ window.addEventListener('DOMContentLoaded', ()=>{
     })
     .catch(err => console.error("Could not load map.svg", err));
 });
+
 
