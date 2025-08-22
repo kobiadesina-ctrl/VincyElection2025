@@ -56,22 +56,25 @@ function renderTooltipFor(districtId){
     tooltip.innerHTML = '<div class="district-name">No data</div><div style="color:var(--muted)">No results yet.</div>';
     return;
   }
-  const total = info.totalVotes || info.candidates.reduce((s,c)=>s+(c.votes||0),0);
-  const rows = info.candidates.map(c=>{
-    const party = c.party || '—';
-    const color = (state.parties[party] && state.parties[party].color) || '#999';
-    const pct = total ? ((c.votes||0)/total*100).toFixed(1) : '0.0';
-    return `<div class="candidate-row">
-              <div class="candidate-left">
-                <div class="party-pill" style="background:${color}"></div>
-                <div>
-                  <div style="font-weight:600">${c.name}</div>
-                  <div style="font-size:12px;color:var(--muted)">${party}</div>
-                </div>
-              </div>
-              <div class="votes">${c.votes || 0} <small style="color:var(--muted)">(${pct}%)</small></div>
-            </div>`;
-  }).join('');
+  const candidates = info.candidates || [];
+  const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
+  const rows = candidates.length
+    ? candidates.map(c=>{
+        const party = c.party || '—';
+        const color = (state.parties[party] && state.parties[party].color) || '#999';
+        const pct = total ? ((c.votes||0)/total*100).toFixed(1) : '0.0';
+        return `<div class="candidate-row">
+                  <div class="candidate-left">
+                    <div class="party-pill" style="background:${color}"></div>
+                    <div>
+                      <div style="font-weight:600">${c.name}</div>
+                      <div style="font-size:12px;color:var(--muted)">${party}</div>
+                    </div>
+                  </div>
+                  <div class="votes">${c.votes || 0} <small style="color:var(--muted)">(${pct}%)</small></div>
+                </div>`;
+      }).join('')
+    : '<div style="color:var(--muted)">No results yet.</div>';
   tooltip.innerHTML = `<div class="district-name">${info.name || districtId}</div>${rows}<div style="margin-top:8px;color:var(--muted);font-size:12px">Total votes: ${total}</div>`;
 }
 
@@ -206,5 +209,6 @@ window.addEventListener('DOMContentLoaded', ()=>{
     })
     .catch(err => console.error("Could not load map.svg", err));
 });
+
 
 
