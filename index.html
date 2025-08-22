@@ -3,19 +3,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Interactive Election Map – Live Update</title>
+  <title>Interactive Election Map</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="wrap">
     <header>
-      <h1>Interactive Election Map — Admin view</h1>
+      <h1>Interactive Election Map</h1>
       <div class="controls">
         <input id="svg-file" type="file" accept="image/svg+xml" />
         <button class="btn" id="reset-map">Reset Map</button>
       </div>
     </header>
 
+    <!-- Popular Vote + Seats -->
     <section class="top-widgets" style="margin-top:14px">
       <div id="popular-vote" class="card" style="padding:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -32,6 +33,7 @@
       </div>
     </section>
 
+    <!-- Map + Legend -->
     <div class="layout">
       <div id="map-area" class="card">
         <div id="svg-wrapper">
@@ -55,45 +57,6 @@
 
       <aside class="right">
         <div class="card">
-          <label>Results JSON (paste and press Apply)</label>
-          <textarea id="results-json">{
-  "parties": {
-    "Alpha": {"color":"#1f77b4"},
-    "Beta": {"color":"#ff7f0e"},
-    "Gamma": {"color":"#2ca02c"}
-  },
-  "districts": {
-    "d-1": {
-      "name":"District 1",
-      "candidates":[{"name":"Alice","party":"Alpha","votes":1200},{"name":"Bob","party":"Beta","votes":800}],
-      "totalVotes":2000
-    },
-    "d-2": {
-      "name":"District 2",
-      "candidates":[{"name":"Carol","party":"Gamma","votes":500},{"name":"Dave","party":"Alpha","votes":1500}],
-      "totalVotes":2000
-    }
-  }
-}
-</textarea>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn" id="apply-results">Apply</button>
-            <button class="btn secondary" id="clear-results">Clear</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <label>Quick controls</label>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="small" id="randomize">Randomize colors</button>
-            <button class="small" id="export-json">Export JSON</button>
-          </div>
-          <p style="margin-top:10px;color:var(--muted);font-size:13px">
-            Tip: keep district element IDs in your SVG like <code>id="d-1"</code> or set <code>data-district</code>.
-          </p>
-        </div>
-
-        <div class="card">
           <label>Legend</label>
           <div id="legend" style="margin-top:8px"></div>
         </div>
@@ -103,7 +66,7 @@
     <div id="tooltip" class="tooltip" style="display:none"></div>
 
     <footer>
-      Built for quick admin-driven live updates — paste JSON or upload a properly annotated SVG.
+      Live election updates: hover over a district to view candidates and results.
     </footer>
   </div>
 
