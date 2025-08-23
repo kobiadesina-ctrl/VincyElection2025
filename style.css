@@ -3,12 +3,13 @@ body{font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);
 .wrap{max-width:1100px;margin:28px auto;padding:20px}
 header{display:flex;gap:16px;align-items:center;justify-content:space-between}
 h1{font-size:20px;margin:0}
-.controls{display:flex;gap:8px;align-items:center}
+.controls{display:none} /* removed per request */
 .card{background:var(--panel);border-radius:12px;box-shadow:0 6px 20px rgba(15,15,20,0.06);padding:12px}
 .layout{display:grid;grid-template-columns:1fr 420px;gap:16px;margin-top:18px}
 #map-area{background:linear-gradient(180deg,#fff,#fbfdff);min-height:560px;border-radius:10px;padding:8px;display:flex;align-items:center;justify-content:center}
 #svg-wrapper{width:100%;height:100%;overflow:hidden}
 #svg-wrapper svg{width:100%;height:auto;display:block}
+.muted{margin-top:6px;font-size:13px;color:var(--muted)}
 
 /* tooltip */
 .tooltip{
@@ -20,20 +21,14 @@ h1{font-size:20px;margin:0}
   border:1px solid rgba(0,0,0,0.08);
   box-shadow:0 6px 18px rgba(11,13,20,0.08);
   font-size:13px;
-  width:320px; /* widened for 4-column layout */
+  width:320px;
 }
 .district-name{font-weight:600;margin-bottom:6px}
 
-/* legacy row (kept for backwards compatibility if any code still uses it) */
-.candidate-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0}
-.party-pill{width:14px;height:14px;border-radius:3px;margin-right:8px;flex-shrink:0}
-.candidate-left{display:flex;align-items:center;gap:8px;flex:1}
-.votes{white-space:nowrap;color:var(--muted);font-size:13px}
-
-/* NEW: 4-column tooltip table (Party | Candidate | Votes | Share) */
+/* 4-column tooltip table (Party | Candidate | Votes | Share) */
 .tt-header, .tt-row{
   display:grid;
-  grid-template-columns:88px 1fr 62px 62px; /* Party | Candidate | Votes | Share */
+  grid-template-columns:88px 1fr 62px 62px;
   align-items:center;
   gap:8px;
 }
@@ -46,58 +41,66 @@ h1{font-size:20px;margin:0}
 }
 .tt-row{padding:4px 0}
 .tt-col{min-width:0}
-
-/* Party cell + logo */
 .party-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.party-chip{
-  width:12px;height:12px;border-radius:3px;flex-shrink:0;
-}
-
-/* Logo height equals candidate-name font height (1em) */
-.party-logo{
-  height:1em;     /* exact max height of the text line */
-  width:auto;
-  display:inline-block;
-  vertical-align:middle;
-  image-rendering:-webkit-optimize-contrast;
-}
-
-/* Candidate text */
-.candidate-cell .candidate-name{
-  font-weight:600;
-  font-size:13px; /* defines 1em for logo sizing */
-  line-height:1;  /* tight alignment with the logo */
-}
-
-/* Numbers */
-.votes-cell, .share-cell{
-  text-align:right;
-  color:var(--muted);
-  font-size:13px;
-}
-
-.tt-total{
-  margin-top:8px;
-  color:var(--muted);
-  font-size:12px;
-}
+.party-chip{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.candidate-cell .candidate-name{font-weight:600;font-size:13px;line-height:1}
+.votes-cell, .share-cell{text-align:right;color:var(--muted);font-size:13px}
+.tt-total{margin-top:8px;color:var(--muted);font-size:12px}
 
 /* hover effect */
 .district-hover{stroke:#000 !important;stroke-width:2.5px !important}
 
 /* top widgets */
-.top-widgets{display:flex;gap:12px;align-items:center}
+.top-widgets{display:flex;gap:12px;align-items:stretch}
 #popular-vote{flex:1}
-.pv-bar{height:26px;border-radius:6px;overflow:hidden;display:flex;align-items:center}
-.pv-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;padding:0 6px}
-#seats{width:260px;height:80px}
+
+/* Popular vote stacked bar with 50% dotted line */
+.pv-wrap{position:relative}
+.pv-bar{
+  position:relative;
+  height:40px;
+  border-radius:8px;
+  overflow:hidden;
+  display:flex;
+  align-items:stretch;
+  background:#f0f2f7;
+}
+.pv-seg{
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  color:#fff;
+  font-weight:600;
+}
+.pv-seg.ndp{background:#f5c02c}  /* NDP color */
+.pv-seg.ulp{background:#ed2633}  /* ULP color */
+
+/* dotted horizontal line at 50% height */
+.pv-50line{
+  position:absolute;
+  left:0; right:0;
+  top:50%;
+  border-top:1px dotted rgba(0,0,0,0.35);
+  pointer-events:none;
+}
+.pv-50label{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  top:calc(50% + 6px);
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* Seats */
+#seats{width:260px;height:120px}
 
 /* right column inputs */
 .right{display:flex;flex-direction:column;gap:12px}
-textarea{width:100%;min-height:180px;font-family:monospace;font-size:13px;padding:8px;border-radius:8px;border:1px solid #e6eef8}
 label{font-size:13px;color:var(--muted)}
-.btn{background:#0b5fff;color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
-.btn.secondary{background:#f3f6ff;color:#0b5fff}
+.btn{display:none} /* removed per request */
 .small{font-size:12px;padding:6px 8px}
 
 footer{margin-top:18px;color:#666;font-size:13px}
@@ -105,5 +108,5 @@ footer{margin-top:18px;color:#666;font-size:13px}
 /* responsive */
 @media (max-width:980px){
   .layout{grid-template-columns:1fr}
-  #seats{width:200px}
+  #seats{width:240px}
 }
