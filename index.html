@@ -10,12 +10,11 @@
   <div class="wrap">
     <header>
       <h1>2025 Election Map</h1>
-      <!-- Controls removed per request -->
     </header>
 
-    <!-- Popular Vote + Seats -->
+    <!-- Popular Vote + Seat Row (same width) -->
     <section class="top-widgets" style="margin-top:14px">
-      <div id="popular-vote" class="card" style="padding:12px">
+      <div id="popular-vote" class="card pv-card">
         <div class="pv-header">
           <strong>Popular Vote</strong>
           <div class="pv-meta">
@@ -24,23 +23,30 @@
             <small id="last-updated" class="muted">Last updated: —</small>
           </div>
         </div>
+
+        <!-- Popular vote stack (fixed width container) -->
         <div class="pv-wrap">
-          <div class="pv-50line"></div>
-          <div class="pv-50label">50%</div>
+          <!-- vertical 50% marker -->
+          <div class="pv-50vline"></div>
+          <div class="pv-50label-top">50%</div>
+          <div class="pv-50caret">▼</div>
+
           <div class="pv-bar" id="pv-bar">
             <!-- two segments injected by JS -->
           </div>
         </div>
-      </div>
 
-      <div id="seats-wrap" class="card" style="padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center">
-        <strong>Seats (of 15)</strong>
-        <svg id="seats" viewBox="0 0 260 120" preserveAspectRatio="xMidYMid meet"></svg>
-        <div id="seat-summary" class="muted">0 / 15 decided</div>
+        <!-- Seat count row (same width as pv-bar) -->
+        <div class="seats-wrap">
+          <div id="seats-row" class="seats-row" aria-label="Seat count">
+            <!-- 15 squares injected by JS -->
+          </div>
+          <div id="seat-summary" class="muted seat-summary">0 / 15 decided</div>
+        </div>
       </div>
     </section>
 
-    <!-- Map + Legend -->
+    <!-- Map + Right column -->
     <div class="layout">
       <div id="map-area" class="card">
         <div id="svg-wrapper">
@@ -52,6 +58,11 @@
         <div class="card">
           <label>Legend</label>
           <div id="legend" style="margin-top:8px"></div>
+          <div class="legend-note">
+            <strong>Swing</strong> shows the change in vote share compared with the
+            <em>same polling divisions</em> that have reported so far, versus their 2020 results.
+            As more divisions are called, the swing re-calculates to reflect only those areas.
+          </div>
         </div>
       </aside>
     </div>
