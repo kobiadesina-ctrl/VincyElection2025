@@ -41,6 +41,16 @@ h1{font-size:20px;margin:0}
 }
 .tt-row{padding:4px 0}
 .tt-col{min-width:0}
+
+/* alignment tweaks */
+.party-cell, .candidate-cell{ text-align:left }
+.votes-cell, .share-cell, .swing-cell{ text-align:right }
+.tt-header .votes-cell,
+.tt-header .share-cell,
+.tt-header .swing-cell{ text-align:right }
+.tt-header .party-cell,
+.tt-header .candidate-cell{ text-align:left }
+
 .party-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .party-chip{width:12px;height:12px;border-radius:3px;flex-shrink:0}
 .candidate-cell .candidate-name{font-weight:600;font-size:13px;line-height:1}
