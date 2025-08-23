@@ -12,7 +12,8 @@ let state = {
     "New Democratic Party": { color: "#f5c02c" },
   },
   districts: {},
-  totalSeats: 15
+  totalSeats: 15,
+  lastUpdated: null
 };
 
 // --------------------
@@ -201,7 +202,7 @@ function renderTooltipFor(districtId){
     `;
   }).join('') : '<div style="color:var(--muted)">No results yet.</div>';
 
-  // NOTE: Give header cells the same classes so CSS aligns headings exactly like data cells
+  // header cells carry same classes so CSS aligns headings like data cells
   tooltip.innerHTML = `
     <div class="district-name">${info.name || nameKey}</div>
     <div class="tt-header">
@@ -240,6 +241,7 @@ function applyResults(){
   renderPopularVote();
   renderSeats();
   renderLegend();
+  renderLastUpdated();
 }
 
 // Popular vote: 2-segment stacked bar (NDP left, ULP right) with 50% dotted line
@@ -374,6 +376,25 @@ function renderLegend(){
 }
 
 // --------------------
+// Last updated label
+// --------------------
+function renderLastUpdated(){
+  const el = qs('#last-updated');
+  if(!el) return;
+  if(!state.lastUpdated){
+    el.textContent = 'Last updated: —';
+    return;
+  }
+  const d = new Date(state.lastUpdated);
+  // Pretty local time: e.g., Aug 22, 2025, 9:13 PM
+  const fmt = new Intl.DateTimeFormat(undefined, {
+    year:'numeric', month:'short', day:'2-digit',
+    hour:'numeric', minute:'2-digit'
+  });
+  el.textContent = `Last updated: ${fmt.format(d)}`;
+}
+
+// --------------------
 // Results polling (Option A): results.json
 // --------------------
 const RESULTS_URL = 'results.json';
@@ -396,6 +417,11 @@ function normalizeSwing(val){
 
 function mergeResults(data){
   if(!data || !data.districts) return;
+
+  // track last updated
+  if (data.updatedAt) {
+    state.lastUpdated = data.updatedAt;
+  }
 
   Object.entries(data.districts).forEach(([rawName, row])=>{
     const name = canonicalName(rawName);
