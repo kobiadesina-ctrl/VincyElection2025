@@ -11,6 +11,16 @@ h1{font-size:20px;margin:0}
 .muted{margin-top:6px;font-size:13px;color:var(--muted)}
 .dot-sep{margin:0 6px;color:var(--muted)}
 
+/* Party banner */
+.party-banner{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;max-width:720px;margin:2px auto 10px auto;
+}
+.pb-left,.pb-right{display:flex;align-items:center;gap:8px}
+.pb-right{flex-direction:row-reverse}
+.pb-logo{width:28px;height:28px;object-fit:contain}
+.pb-acronym{font-weight:700;letter-spacing:0.5px}
+
 /* Popular vote header layout */
 .pv-card{padding:12px}
 .pv-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -34,6 +44,14 @@ h1{font-size:20px;margin:0}
 .seat-square{width:100%;height:100%;border-radius:4px;border:1px solid rgba(255,255,255,0.8);box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04)}
 .seat-summary{margin-top:8px}
 
+/* Seat counts line */
+.seat-counts{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  width:100%;max-width:720px;margin:10px auto 0 auto;
+}
+.seat-count .sc-title{font-weight:700;margin-bottom:4px}
+.seat-count .sc-line{color:#333}
+
 /* RIGHT COLUMN */
 .right{display:flex;flex-direction:column;gap:12px}
 label{font-size:13px;color:var(--muted)}
@@ -48,7 +66,7 @@ label{font-size:13px;color:var(--muted)}
 .lm-name{grid-column:1;font-size:13px;color:#222;padding:4px 0}
 .lm-swatch{width:18px;height:18px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);justify-self:center}
 .ulp-declared{background:#ed2633}
-.ulp-leading{background:#f77e81}
+.ulp-leading{background:#fedfad}  /* updated ULP leading tint */
 .ndp-declared{background:#f5c02c}
 .ndp-leading{background:#fedda6}
 
@@ -68,20 +86,28 @@ label{font-size:13px;color:var(--muted)}
 .tt-col{min-width:0}
 .party-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .party-chip{width:12px;height:12px;border-radius:3px;flex-shrink:0}
-.candidate-cell{display:flex;align-items:center;gap:6px}
-.candidate-name{font-weight:400;font-size:13px;line-height:1} /* default unbolded */
-.declared-icon{width:16px;height:16px;flex:0 0 auto;display:inline-block}
+
+/* Candidate cell: prevent icon overlap on mobile */
+.candidate-cell{
+  display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow:hidden;min-width:0;
+}
+.candidate-name{font-weight:400;font-size:13px;line-height:1;flex:1 1 auto;min-width:0}
+.declared-icon{width:16px;height:16px;flex:0 0 auto;margin-left:6px}
+
+/* Right-aligned numeric cells */
 .votes-cell,.share-cell,.swing-cell{text-align:right;font-size:13px}
-.votes-cell,.share-cell{color:var(--muted)}
-.swing-cell{font-weight:600}
+.votes-cell,.share-cell{color:#000} /* font must be black (not muted) */
+.swing-cell{font-weight:700}
+
+/* Swing colors stay green/red */
 .swing-pos{color:#1a7f37}
 .swing-neg{color:#d03a3a}
-.swing-zero{color:var(--muted)}
-.tt-total{margin-top:8px;color:var(--muted);font-size:12px}
+.swing-zero{color:#000}
 
-/* Declared row emphasis */
-.tt-row--declared .tt-col{font-weight:700} /* all values bold */
+/* Declared row emphasis: black text, colored background from declared party */
+.tt-row--declared{color:#000}
 .tt-row--declared .candidate-name{font-weight:700}
+.tt-row--declared .tt-col{font-weight:700}
 
 /* Map hover outline */
 .district-hover{stroke:#000 !important;stroke-width:2.5px !important}
@@ -89,6 +115,6 @@ label{font-size:13px;color:var(--muted)}
 /* Responsive */
 @media (max-width:980px){
   .layout{grid-template-columns:1fr}
-  .pv-wrap,.seats-wrap{max-width:100%}
+  .pv-wrap,.seats-wrap,.party-banner,.seat-counts{max-width:100%}
   .tooltip{width:min(90vw,380px)}
 }
