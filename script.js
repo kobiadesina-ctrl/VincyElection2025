@@ -15,11 +15,15 @@ let state = {
   totalSeats: 15
 };
 
-// ---- A) Party aliases (short codes) ----
+// --------------------
+// (1) Party aliases + Seed candidates
+// --------------------
+
+// Party aliases (short codes)
 state.parties["ULP"] = state.parties["Unity Labour Party"];
 state.parties["NDP"] = state.parties["New Democratic Party"];
 
-// ---- B) Candidate roster (NDP vs ULP) ----
+// Candidate roster (NDP vs ULP)
 const CANDIDATE_CONFIG = {
   "North Windward":         { NDP: "Shevern John",         ULP: "Grace Walters"      },
   "North Central Windward": { NDP: "Chieftain Neptune",    ULP: "Ralph Gonsalves"    },
@@ -38,16 +42,18 @@ const CANDIDATE_CONFIG = {
   "Southern Grenadines":    { NDP: "Terrance Ollivierre",  ULP: "Chevonne Stewart"   },
 };
 
-function seedCandidates() {
-  Object.entries(CANDIDATE_CONFIG).forEach(([name, pair]) => {
-    state.districts[name] = {
-      name,
-      candidates: [
-        { party: "NDP", name: pair.NDP, votes: 0 },
-        { party: "ULP", name: pair.ULP, votes: 0 }
-      ],
-      totalVotes: 0
-    };
+function seedCandidates(){
+  Object.entries(CANDIDATE_CONFIG).forEach(([name, pair])=>{
+    if(!state.districts[name]){
+      state.districts[name] = {
+        name,
+        candidates: [
+          { party: "NDP", name: pair.NDP, votes: 0 },
+          { party: "ULP", name: pair.ULP, votes: 0 },
+        ],
+        totalVotes: 0
+      };
+    }
   });
 }
 seedCandidates();
@@ -116,14 +122,21 @@ function onDistrictMove(e, el){
 }
 
 // --------------------
-// Tooltip renderer (4 columns + logos)
+// (2) Tooltip renderer (always renders default layout)
 // --------------------
 function renderTooltipFor(districtId){
-  const info = state.districts[districtId];
-
+  // Prefer seeded data; if missing, synthesize from CANDIDATE_CONFIG so we never show "No data"
+  let info = state.districts[districtId];
   if(!info){
-    tooltip.innerHTML = '<div class="district-name">No data</div><div style="color:var(--muted)">No results yet.</div>';
-    return;
+    const cfg = CANDIDATE_CONFIG && CANDIDATE_CONFIG[districtId];
+    info = cfg ? {
+      name: districtId,
+      candidates: [
+        { party: "NDP", name: cfg.NDP, votes: 0 },
+        { party: "ULP", name: cfg.ULP, votes: 0 }
+      ],
+      totalVotes: 0
+    } : { name: districtId, candidates: [], totalVotes: 0 };
   }
 
   const candidates = info.candidates || [];
@@ -357,7 +370,7 @@ function bindUI(){
 }
 
 // --------------------
-// Init
+// Init (auto-load map.svg if present)
 // --------------------
 document.addEventListener('DOMContentLoaded', ()=>{
   bindUI();
