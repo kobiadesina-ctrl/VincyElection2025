@@ -3,7 +3,7 @@ body{font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);
 .wrap{max-width:1100px;margin:28px auto;padding:20px}
 header{display:flex;gap:16px;align-items:center;justify-content:space-between}
 h1{font-size:20px;margin:0}
-.controls{display:none} /* removed per request */
+.controls{display:none} /* no upload/reset controls */
 .card{background:var(--panel);border-radius:12px;box-shadow:0 6px 20px rgba(15,15,20,0.06);padding:12px}
 .layout{display:grid;grid-template-columns:1fr 420px;gap:16px;margin-top:18px}
 #map-area{background:linear-gradient(180deg,#fff,#fbfdff);min-height:560px;border-radius:10px;padding:8px;display:flex;align-items:center;justify-content:center}
@@ -21,14 +21,14 @@ h1{font-size:20px;margin:0}
   border:1px solid rgba(0,0,0,0.08);
   box-shadow:0 6px 18px rgba(11,13,20,0.08);
   font-size:13px;
-  width:320px;
+  width:380px; /* wider for 5 columns */
 }
 .district-name{font-weight:600;margin-bottom:6px}
 
-/* 4-column tooltip table (Party | Candidate | Votes | Share) */
+/* 5-column tooltip table (Party | Candidate | Votes | Share | Swing) */
 .tt-header, .tt-row{
   display:grid;
-  grid-template-columns:88px 1fr 62px 62px;
+  grid-template-columns:88px 1fr 62px 62px 66px;
   align-items:center;
   gap:8px;
 }
@@ -44,7 +44,12 @@ h1{font-size:20px;margin:0}
 .party-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .party-chip{width:12px;height:12px;border-radius:3px;flex-shrink:0}
 .candidate-cell .candidate-name{font-weight:600;font-size:13px;line-height:1}
-.votes-cell, .share-cell{text-align:right;color:var(--muted);font-size:13px}
+.votes-cell, .share-cell, .swing-cell{text-align:right;font-size:13px}
+.votes-cell, .share-cell{color:var(--muted)}
+.swing-cell{font-weight:600}
+.swing-pos{color:#1a7f37}
+.swing-neg{color:#d03a3a}
+.swing-zero{color:var(--muted)}
 .tt-total{margin-top:8px;color:var(--muted);font-size:12px}
 
 /* hover effect */
@@ -74,8 +79,8 @@ h1{font-size:20px;margin:0}
   color:#fff;
   font-weight:600;
 }
-.pv-seg.ndp{background:#f5c02c}  /* NDP color */
-.pv-seg.ulp{background:#ed2633}  /* ULP color */
+.pv-seg.ndp{background:#f5c02c}  /* NDP */
+.pv-seg.ulp{background:#ed2633}  /* ULP */
 
 /* dotted horizontal line at 50% height */
 .pv-50line{
@@ -97,10 +102,10 @@ h1{font-size:20px;margin:0}
 /* Seats */
 #seats{width:260px;height:120px}
 
-/* right column inputs */
+/* right column */
 .right{display:flex;flex-direction:column;gap:12px}
 label{font-size:13px;color:var(--muted)}
-.btn{display:none} /* removed per request */
+.btn{display:none}
 .small{font-size:12px;padding:6px 8px}
 
 footer{margin-top:18px;color:#666;font-size:13px}
