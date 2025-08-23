@@ -1,10 +1,11 @@
 /************************************************************
- * Election Map — robust SVG binding + results rendering
- * - Binds district IDs (markers) to their paintable shapes
- * - Colors via inline style (beats class/CSS inside SVG)
+ * Election Map — ultra-robust SVG binding + results rendering
+ * - Finds districts via marker->shapes mapping
+ * - Falls back to inkscape:label and heuristics if needed
+ * - Colors via inline style (overrides CSS/class fills)
  * - Map colors match seat-row rules (declared vs leading)
  * - Popular vote bar with 50% marker above
- * - Seat row packs NDP from left, ULP from right
+ * - Seat row packs NDP from left, ULP from right, blanks in middle
  ************************************************************/
 
 // ---------- DOM helpers ----------
@@ -82,10 +83,27 @@ const ID_TO_NAME = {
   CL: "Central Leeward",
   MQ: "Marriaqua",
 };
+const NAME_TO_LABEL = {
+  "North Windward": "NORTH WINDWARD",
+  "North Central Windward": "NORTH CENTRAL WINDWARD",
+  "South Central Windward": "SOUTH CENTRAL WINDWARD",
+  "South Windward": "SOUTH WINDWARD",
+  "Marriaqua": "MARRIAQUA",
+  "East St. George": "EAST ST. GEORGE",
+  "West St. George": "WEST ST. GEORGE",
+  "East Kingstown": "EAST KINGSTOWN",
+  "Central Kingstown": "CENTRAL KINGSTOWN",
+  "West Kingstown": "WEST KINGSTOWN",
+  "South Leeward": "SOUTH LEEWARD",
+  "Central Leeward": "CENTRAL LEEWARD",
+  "North Leeward": "NORTH LEEWARD",
+  "Northern Grenadines": "NORTHERN GRENADINES",
+  "Southern Grenadines": "SOUTHERN GRENADINES",
+};
 const canonicalName = raw => ID_TO_NAME[raw] || raw;
 
-// ---------- SVG district mapping ----------
-// Map<"NW", Array<paintable elements>>
+// ---------- SVG district mapping (robust) ----------
+/** Map<"NW", Array<paintable elements>> */
 let districtTargets = new Map();
 
 function isMarker(el) {
@@ -97,10 +115,32 @@ function isPaintable(el) {
   return t === 'path' || t === 'polygon' || t === 'rect' || t === 'ellipse' || t === 'circle';
 }
 
-function buildDistrictTargets(svg) {
-  districtTargets = new Map();
+/** attach hover events to a district (all its targets) */
+function attachHover(key, targets) {
+  const enter = e => {
+    const name = canonicalName(key);
+    renderTooltipFor(name);
+    tooltip.style.display = 'block';
+    onTooltipMove(e);
+    targets.forEach(t => t.classList.add('district-hover'));
+  };
+  const leave = () => {
+    tooltip.style.display = 'none';
+    targets.forEach(t => t.classList.remove('district-hover'));
+  };
+  const move = onTooltipMove;
 
-  // Build a single ordered list of markers + paintables
+  targets.forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('mouseenter', enter);
+    el.addEventListener('mousemove', move);
+    el.addEventListener('mouseleave', leave);
+  });
+}
+
+/** find paintables that immediately follow marker order (primary strategy) */
+function buildTargetsByOrder(svg) {
+  const map = new Map();
   const ordered = Array.from(svg.querySelectorAll('[id][data-district], path, polygon, rect, ellipse, circle'));
 
   let currentKey = null;
@@ -108,63 +148,96 @@ function buildDistrictTargets(svg) {
     const el = ordered[i];
 
     if (isMarker(el)) {
-      // New district starts
       currentKey = el.getAttribute('id') || el.getAttribute('data-district');
-      if (!districtTargets.has(currentKey)) districtTargets.set(currentKey, []);
-      // Also attach hover listeners to the marker itself (optional)
-      attachHoverForMarker(el, currentKey);
+      if (!map.has(currentKey)) map.set(currentKey, []);
       continue;
     }
-
-    // Assign subsequent paintables to currentKey until next marker
     if (currentKey && isPaintable(el)) {
-      el.dataset.districtRef = currentKey;
-      // Store original fill once
       if (!el.dataset.origfill) {
         const orig = el.style.fill || el.getAttribute('fill') || window.getComputedStyle(el).fill;
         el.dataset.origfill = (orig && orig !== 'none') ? orig : '#d7d7d7';
       }
-      districtTargets.get(currentKey).push(el);
-      attachHoverForPaintable(el, currentKey);
+      el.dataset.districtRef = currentKey;
+      map.get(currentKey).push(el);
     }
   }
+  return map;
 }
 
-function attachHoverForMarker(marker, key) {
-  marker.style.cursor = 'pointer';
-  marker.addEventListener('mouseenter', e => {
-    const name = canonicalName(key);
-    renderTooltipFor(name);
-    tooltip.style.display = 'block';
-    onTooltipMove(e);
-    // add hover stroke to all paintables in this district
-    const targets = districtTargets.get(key) || [];
-    targets.forEach(t => t.classList.add('district-hover'));
+/** fallback A: find by inkscape:label exactly matching the district label */
+function fallbackByInkscapeLabel(svg, key) {
+  const name = canonicalName(key);
+  const label = NAME_TO_LABEL[name];
+  if (!label) return [];
+  // inkscape:label attribute requires escaped colon in selectors
+  const sel = `[inkscape\\:label="${label}"], [inkscape\\:label="${label.toLowerCase()}"], [inkscape\\:label="${label.toUpperCase()}"]`;
+  const containers = Array.from(svg.querySelectorAll(sel));
+  const paints = [];
+  containers.forEach(c => {
+    if (isPaintable(c)) paints.push(c);
+    paints.push(...c.querySelectorAll('path,polygon,rect,ellipse,circle'));
   });
-  marker.addEventListener('mousemove', onTooltipMove);
-  marker.addEventListener('mouseleave', () => {
-    tooltip.style.display = 'none';
-    const targets = districtTargets.get(key) || [];
-    targets.forEach(t => t.classList.remove('district-hover'));
+  paints.forEach(el => {
+    if (!el.dataset.origfill) {
+      const orig = el.style.fill || el.getAttribute('fill') || window.getComputedStyle(el).fill;
+      el.dataset.origfill = (orig && orig !== 'none') ? orig : '#d7d7d7';
+    }
   });
+  return paints;
 }
 
-function attachHoverForPaintable(el, key) {
-  el.style.cursor = 'pointer';
-  el.addEventListener('mouseenter', e => {
-    const name = canonicalName(key);
-    renderTooltipFor(name);
-    tooltip.style.display = 'block';
-    onTooltipMove(e);
-    // hover styling for all shapes in the district
-    const targets = districtTargets.get(key) || [];
-    targets.forEach(t => t.classList.add('district-hover'));
+/** fallback B: heuristic — any element whose id starts with the key or label words */
+function fallbackByHeuristic(svg, key) {
+  const name = canonicalName(key);
+  const guessWords = (NAME_TO_LABEL[name] || name).toLowerCase().split(/\s+/).filter(Boolean);
+  const paints = Array.from(svg.querySelectorAll('path,polygon,rect,ellipse,circle')).filter(el => {
+    const id = (el.id || '').toLowerCase();
+    const cls = (el.getAttribute('class') || '').toLowerCase();
+    return guessWords.some(w => id.includes(w) || cls.includes(w));
   });
-  el.addEventListener('mousemove', onTooltipMove);
-  el.addEventListener('mouseleave', () => {
-    tooltip.style.display = 'none';
-    const targets = districtTargets.get(key) || [];
-    targets.forEach(t => t.classList.remove('district-hover'));
+  paints.forEach(el => {
+    if (!el.dataset.origfill) {
+      const orig = el.style.fill || el.getAttribute('fill') || window.getComputedStyle(el).fill;
+      el.dataset.origfill = (orig && orig !== 'none') ? orig : '#d7d7d7';
+    }
+  });
+  return paints;
+}
+
+/** Build robust districtTargets map with fallbacks */
+function buildDistrictTargets(svg) {
+  districtTargets = buildTargetsByOrder(svg);
+
+  // For any district key we know about from the SVG markers, keep them.
+  // Also, in case some markers weren't in the file, we’ll try to create entries by label.
+  const markerKeys = new Set(Array.from(svg.querySelectorAll('[id][data-district]')).map(e => e.getAttribute('id')));
+
+  // Keys we expect from ID_TO_NAME
+  const expectedKeys = Object.keys(ID_TO_NAME);
+
+  expectedKeys.forEach(key => {
+    if (!districtTargets.has(key) || districtTargets.get(key).length === 0) {
+      // Try by inkscape:label
+      const fbA = fallbackByInkscapeLabel(svg, key);
+      if (fbA.length) {
+        districtTargets.set(key, fbA);
+      } else {
+        // Try heuristics
+        const fbB = fallbackByHeuristic(svg, key);
+        if (fbB.length) {
+          districtTargets.set(key, fbB);
+        }
+      }
+    }
+  });
+
+  // Attach hovers and finalize
+  districtTargets.forEach((targets, key) => {
+    if (!targets || targets.length === 0) {
+      console.warn(`[map] No shapes found for district key "${key}". Check SVG labels/ids.`);
+      return;
+    }
+    attachHover(key, targets);
   });
 }
 
@@ -262,8 +335,9 @@ function applyResults() {
   if (!svg) return;
 
   // Paint each district's actual shapes
+  let missing = [];
   districtTargets.forEach((targets, key) => {
-    if (!targets || !targets.length) return;
+    if (!targets || !targets.length) { missing.push(key); return; }
 
     const name = canonicalName(key);
     const info = state.districts[name];
@@ -297,6 +371,11 @@ function applyResults() {
     targets.forEach(el => { el.style.fill = fillColor; });
   });
 
+  if (missing.length) {
+    console.warn(`[map] Districts with no paint targets found: ${missing.join(', ')}`);
+    console.warn('Check SVG ids (e.g., NW/EG) and inkscape:label values match NAME_TO_LABEL/ID_TO_NAME.');
+  }
+
   renderPopularVote();
   renderSeatRow();
   renderLegendBasics();
@@ -306,11 +385,9 @@ function applyResults() {
 // ---------- Popular vote (2 segments) ----------
 function renderPopularVote() {
   const partyTotals = {};
-  let totalVotes = 0;
   Object.values(state.districts).forEach(d => {
     (d.candidates || []).forEach(c => {
       partyTotals[c.party] = (partyTotals[c.party] || 0) + (c.votes || 0);
-      totalVotes += (c.votes || 0);
     });
   });
 
