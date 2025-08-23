@@ -16,9 +16,13 @@
     <!-- Popular Vote + Seats -->
     <section class="top-widgets" style="margin-top:14px">
       <div id="popular-vote" class="card" style="padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="pv-header">
           <strong>Popular Vote</strong>
-          <small id="pv-total" style="color:var(--muted)">0 votes</small>
+          <div class="pv-meta">
+            <small id="pv-total" class="muted">0 votes</small>
+            <span class="dot-sep">•</span>
+            <small id="last-updated" class="muted">Last updated: —</small>
+          </div>
         </div>
         <div class="pv-wrap">
           <div class="pv-50line"></div>
