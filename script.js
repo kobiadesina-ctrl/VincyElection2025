@@ -145,7 +145,7 @@ function onDistrictMove(e, el){
 }
 
 // --------------------
-// Tooltip renderer (adds Swing column)
+// Tooltip renderer (with Swing column)
 // --------------------
 function renderTooltipFor(districtId){
   const nameKey = canonicalName(districtId);
@@ -176,7 +176,6 @@ function renderTooltipFor(districtId){
     if (typeof s !== 'string') return '0.0%';
     const t = s.trim();
     if (t === '0' || t === '0%' || t === '+0%' || t === '-0%') return '0.0%';
-    // ensure one decimal and % if possible
     const m = t.match(/^([+\-]?)(\d+(\.\d+)?)/);
     if (m) return `${m[1] || (parseFloat(m[2])===0 ? '' : '+')}${(+m[2]).toFixed(1)}%`;
     return t;
@@ -202,14 +201,15 @@ function renderTooltipFor(districtId){
     `;
   }).join('') : '<div style="color:var(--muted)">No results yet.</div>';
 
+  // NOTE: Give header cells the same classes so CSS aligns headings exactly like data cells
   tooltip.innerHTML = `
     <div class="district-name">${info.name || nameKey}</div>
     <div class="tt-header">
-      <div class="tt-col">Party</div>
-      <div class="tt-col">Candidate</div>
-      <div class="tt-col">Votes</div>
-      <div class="tt-col">Share</div>
-      <div class="tt-col">Swing</div>
+      <div class="tt-col party-cell">Party</div>
+      <div class="tt-col candidate-cell">Candidate</div>
+      <div class="tt-col votes-cell">Votes</div>
+      <div class="tt-col share-cell">Share</div>
+      <div class="tt-col swing-cell">Swing</div>
     </div>
     ${rows}
     <div class="tt-total">Total votes: ${total}</div>
