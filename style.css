@@ -32,6 +32,7 @@ h1{font-size:20px;margin:0}
   width:100%;
   max-width:720px;            /* fixed visual cap so seats row matches */
   margin:0 auto 10px auto;
+  padding-top:30px;           /* space ABOVE the bar for 50% marker */
 }
 .pv-bar{
   position:relative;
@@ -54,13 +55,13 @@ h1{font-size:20px;margin:0}
 .pv-seg.ndp{background:#f5c02c}  /* NDP declared color */
 .pv-seg.ulp{background:#ed2633}  /* ULP declared color */
 
-/* Vertical 50% marker: dotted line, label above, caret below */
+/* 50% vertical marker ABOVE the bar only */
 .pv-50vline{
   position:absolute;
-  top:-10px;                   /* extend a bit above */
-  bottom:-14px;                /* extend a bit below for caret area */
   left:50%;
   width:0;
+  bottom:40px;                /* sits exactly above the bar (bar is 40px tall) */
+  height:12px;                /* only above, not below */
   border-left:2px dotted rgba(0,0,0,0.35);
   pointer-events:none;
 }
@@ -68,7 +69,8 @@ h1{font-size:20px;margin:0}
   position:absolute;
   left:50%;
   transform:translateX(-50%);
-  top:-18px;
+  bottom:40px;                /* reference bar top */
+  margin-bottom:18px;         /* label sits highest */
   font-size:12px;
   color:var(--muted);
 }
@@ -76,7 +78,8 @@ h1{font-size:20px;margin:0}
   position:absolute;
   left:50%;
   transform:translateX(-50%);
-  bottom:-16px;
+  bottom:40px;                /* reference bar top */
+  margin-bottom:14px;         /* caret sits just above the dotted line */
   font-size:12px;
   color:var(--muted);
 }
@@ -102,15 +105,46 @@ h1{font-size:20px;margin:0}
 }
 .seat-summary{margin-top:8px}
 
-/* LEGEND */
+/* LEGEND - basic list of parties (declared colors) */
 .right{display:flex;flex-direction:column;gap:12px}
 label{font-size:13px;color:var(--muted)}
-.legend-note{
+
+/* New compact legend matrix for Declared vs Leading */
+.legend-matrix{
   margin-top:8px;
+  display:grid;
+  grid-template-columns: 1fr auto auto;
+  align-items:center;
+  gap:8px 12px;
+}
+.lm-head{
+  grid-row: 1;
   font-size:12px;
   color:#555;
-  line-height:1.3;
+  transform-origin:left bottom;
+  transform:rotate(-24deg);   /* angle headings so the two columns sit closer */
+  margin-left:8px;
 }
+.lm-declared{grid-column:2}
+.lm-leading{grid-column:3}
+.lm-row{
+  display:contents; /* allow name + two swatches to align in grid */
+}
+.lm-name{
+  font-size:13px;
+  color:#222;
+  padding:4px 0;
+}
+.lm-swatch{
+  width:18px; height:18px;
+  border-radius:4px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);
+  justify-self:center;
+}
+.ulp-declared{background:#ed2633}
+.ulp-leading{background:#f77e81}
+.ndp-declared{background:#f5c02c}
+.ndp-leading{background:#fedda6}
 
 /* TOOLTIP */
 .tooltip{
