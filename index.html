@@ -15,6 +15,18 @@
     <!-- Popular Vote + Seat Row (same width) -->
     <section class="top-widgets" style="margin-top:14px">
       <div id="popular-vote" class="card pv-card">
+        <!-- Party banner with logos -->
+        <div class="party-banner">
+          <div class="pb-left">
+            <img src="NDP logo.png" alt="NDP" class="pb-logo" />
+            <span class="pb-acronym">NDP</span>
+          </div>
+          <div class="pb-right">
+            <span class="pb-acronym">ULP</span>
+            <img src="ULP logo.png" alt="ULP" class="pb-logo" />
+          </div>
+        </div>
+
         <div class="pv-header">
           <strong>Popular Vote</strong>
           <div class="pv-meta">
@@ -42,6 +54,26 @@
             <!-- 15 squares injected by JS -->
           </div>
           <div id="seat-summary" class="muted seat-summary">0 / 15 decided</div>
+        </div>
+
+        <!-- New seat totals per party -->
+        <div class="seat-counts">
+          <div class="seat-count ndp">
+            <div class="sc-title">NDP</div>
+            <div class="sc-line">
+              <span>Declared:</span> <strong id="sc-ndp-declared">0</strong>
+              <span class="dot-sep">•</span>
+              <span>Leading:</span> <strong id="sc-ndp-leading">0</strong>
+            </div>
+          </div>
+          <div class="seat-count ulp">
+            <div class="sc-title">ULP</div>
+            <div class="sc-line">
+              <span>Declared:</span> <strong id="sc-ulp-declared">0</strong>
+              <span class="dot-sep">•</span>
+              <span>Leading:</span> <strong id="sc-ulp-leading">0</strong>
+            </div>
+          </div>
         </div>
       </div>
     </section>
