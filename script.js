@@ -575,7 +575,9 @@ function mergeResults(data){
       } else if (entry && typeof entry === 'object') {
         votes = Number(entry.votes || 0);
         // USE SWING AS-IS FROM JSON (string); default "0.0%"
-        if (entry.swing != null && entry.swing !== "") swingStr = String(entry.swing);
+        if (entry.swing != null && entry.swing !== "") {
+  swingStr = String(entry.swing).replace(/^\-\+/, "-");
+}
       }
       const cand = (d.candidates || []).find(c=>c.party === partyKey);
       if (cand) {
@@ -620,3 +622,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
+
