@@ -16,7 +16,7 @@ let state = {
 };
 
 // --------------------
-// (1) Party aliases + Seed candidates
+// Party aliases + Candidate seeding
 // --------------------
 
 // Party aliases (short codes)
@@ -59,10 +59,33 @@ function seedCandidates(){
 seedCandidates();
 
 // --------------------
+// ID -> Name normalization for SVG
+// --------------------
+const ID_TO_NAME = {
+  EG: "East St. George",
+  WG: "West St. George",
+  SG: "Southern Grenadines",
+  NG: "Northern Grenadines",
+  EK: "East Kingstown",
+  CK: "Central Kingstown",
+  WK: "West Kingstown",
+  NC: "North Central Windward",
+  NW: "North Windward",
+  SC: "South Central Windward",
+  SW: "South Windward",
+  SL: "South Leeward",
+  NL: "North Leeward",
+  CL: "Central Leeward",
+  MQ: "Marriaqua",
+};
+
+const canonicalName = raw => ID_TO_NAME[raw] || raw;
+
+// --------------------
 // District hookup
 // --------------------
 function attachToDistricts(svgRoot){
-  const districts = svgRoot.querySelectorAll('[data-district], path[id^="d-"]');
+  const districts = svgRoot.querySelectorAll('[data-district], path[id^="d-"], path[id]');
   districts.forEach(el => {
     el.style.cursor = 'pointer';
     el.addEventListener('mouseenter', e => onDistrictHover(e, el));
@@ -96,10 +119,11 @@ function loadSVG(svgText){
 // Hover + Tooltip
 // --------------------
 function onDistrictHover(e, el){
-  const id = el.getAttribute('data-district') || el.id;
+  const raw = el.getAttribute('data-district') || el.id || '';
+  const id = canonicalName(raw);
 
   // bring to front
-  el.parentNode.appendChild(el);
+  if (el.parentNode) el.parentNode.appendChild(el);
 
   el.classList.add('district-hover');
   renderTooltipFor(id);
@@ -122,27 +146,30 @@ function onDistrictMove(e, el){
 }
 
 // --------------------
-// (2) Tooltip renderer (always renders default layout)
+// Tooltip renderer (always renders default layout)
 // --------------------
 function renderTooltipFor(districtId){
+  // Normalize (e.g., "NW" -> "North Windward")
+  const nameKey = canonicalName(districtId);
+
   // Prefer seeded data; if missing, synthesize from CANDIDATE_CONFIG so we never show "No data"
-  let info = state.districts[districtId];
+  let info = state.districts[nameKey];
   if(!info){
-    const cfg = CANDIDATE_CONFIG && CANDIDATE_CONFIG[districtId];
+    const cfg = CANDIDATE_CONFIG && CANDIDATE_CONFIG[nameKey];
     info = cfg ? {
-      name: districtId,
+      name: nameKey,
       candidates: [
         { party: "NDP", name: cfg.NDP, votes: 0 },
         { party: "ULP", name: cfg.ULP, votes: 0 }
       ],
       totalVotes: 0
-    } : { name: districtId, candidates: [], totalVotes: 0 };
+    } : { name: nameKey, candidates: [], totalVotes: 0 };
   }
 
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
 
-  // Map party -> meta (color + logo)
+  // Party meta + logos
   const partyMeta = (p) => {
     const meta = {
       color: (state.parties[p] && state.parties[p].color) || '#999',
@@ -164,11 +191,10 @@ function renderTooltipFor(districtId){
       <div class="tt-row">
         <div class="tt-col party-cell">
           <span class="party-chip" style="background:${meta.color}"></span>
-          ${logoImg}
           <span class="party-name">${meta.short}</span>
         </div>
         <div class="tt-col candidate-cell">
-          <span class="candidate-name">${c.name || '—'}</span>
+          ${logoImg}<span class="candidate-name">${c.name || '—'}</span>
         </div>
         <div class="tt-col votes-cell">${c.votes || 0}</div>
         <div class="tt-col share-cell">${pct}%</div>
@@ -177,7 +203,7 @@ function renderTooltipFor(districtId){
   }).join('') : '<div style="color:var(--muted)">No results yet.</div>';
 
   tooltip.innerHTML = `
-    <div class="district-name">${info.name || districtId}</div>
+    <div class="district-name">${info.name || nameKey}</div>
     <div class="tt-header">
       <div class="tt-col">Party</div>
       <div class="tt-col">Candidate</div>
@@ -195,9 +221,10 @@ function renderTooltipFor(districtId){
 function applyResults(){
   const svg = svgWrapper.querySelector('svg');
   if(!svg) return;
-  const districtEls = svg.querySelectorAll('[data-district], path[id^="d-"]');
+  const districtEls = svg.querySelectorAll('[data-district], path[id^="d-"], path[id]');
   districtEls.forEach(el=>{
-    const id = el.getAttribute('data-district') || el.id;
+    const raw = el.getAttribute('data-district') || el.id || '';
+    const id = canonicalName(raw);
     const info = state.districts[id];
     if(info && info.candidates && info.candidates.length){
       const winner = info.candidates.slice().sort((a,b)=> (b.votes||0) - (a.votes||0))[0];
