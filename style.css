@@ -3,7 +3,6 @@ body{font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);
 .wrap{max-width:1100px;margin:28px auto;padding:20px}
 header{display:flex;gap:16px;align-items:center;justify-content:space-between}
 h1{font-size:20px;margin:0}
-.controls{display:none} /* no upload/reset controls */
 .card{background:var(--panel);border-radius:12px;box-shadow:0 6px 20px rgba(15,15,20,0.06);padding:12px}
 .layout{display:grid;grid-template-columns:1fr 420px;gap:16px;margin-top:18px}
 #map-area{background:linear-gradient(180deg,#fff,#fbfdff);min-height:560px;border-radius:10px;padding:8px;display:flex;align-items:center;justify-content:center}
@@ -13,6 +12,7 @@ h1{font-size:20px;margin:0}
 .dot-sep{margin:0 6px;color:var(--muted)}
 
 /* Popular vote header layout */
+.pv-card{padding:12px}
 .pv-header{
   display:flex;
   align-items:center;
@@ -26,7 +26,93 @@ h1{font-size:20px;margin:0}
   color:var(--muted);
 }
 
-/* tooltip */
+/* POPULAR VOTE (stacked bar) */
+.pv-wrap{
+  position:relative;
+  width:100%;
+  max-width:720px;            /* fixed visual cap so seats row matches */
+  margin:0 auto 10px auto;
+}
+.pv-bar{
+  position:relative;
+  height:40px;
+  border-radius:8px;
+  overflow:hidden;
+  display:flex;
+  align-items:stretch;
+  background:#f0f2f7;
+}
+.pv-seg{
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  color:#fff;
+  font-weight:600;
+}
+.pv-seg.ndp{background:#f5c02c}  /* NDP declared color */
+.pv-seg.ulp{background:#ed2633}  /* ULP declared color */
+
+/* Vertical 50% marker: dotted line, label above, caret below */
+.pv-50vline{
+  position:absolute;
+  top:-10px;                   /* extend a bit above */
+  bottom:-14px;                /* extend a bit below for caret area */
+  left:50%;
+  width:0;
+  border-left:2px dotted rgba(0,0,0,0.35);
+  pointer-events:none;
+}
+.pv-50label-top{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  top:-18px;
+  font-size:12px;
+  color:var(--muted);
+}
+.pv-50caret{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:-16px;
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* SEAT ROW (15 squares, same width as pv-wrap) */
+.seats-wrap{
+  width:100%;
+  max-width:720px;
+  margin:18px auto 4px auto;
+}
+.seats-row{
+  display:grid;
+  grid-template-columns: repeat(15, minmax(0,1fr));
+  gap:8px;
+  height:28px;
+}
+.seat-square{
+  width:100%;
+  height:100%;
+  border-radius:4px;
+  border:1px solid rgba(255,255,255,0.8);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04);
+}
+.seat-summary{margin-top:8px}
+
+/* LEGEND */
+.right{display:flex;flex-direction:column;gap:12px}
+label{font-size:13px;color:var(--muted)}
+.legend-note{
+  margin-top:8px;
+  font-size:12px;
+  color:#555;
+  line-height:1.3;
+}
+
+/* TOOLTIP */
 .tooltip{
   position:fixed;
   pointer-events:none;
@@ -67,66 +153,11 @@ h1{font-size:20px;margin:0}
 .swing-zero{color:var(--muted)}
 .tt-total{margin-top:8px;color:var(--muted);font-size:12px}
 
-/* hover effect */
+/* Map hover effect */
 .district-hover{stroke:#000 !important;stroke-width:2.5px !important}
 
-/* top widgets */
-.top-widgets{display:flex;gap:12px;align-items:stretch}
-#popular-vote{flex:1}
-
-/* Popular vote stacked bar with 50% dotted line */
-.pv-wrap{position:relative}
-.pv-bar{
-  position:relative;
-  height:40px;
-  border-radius:8px;
-  overflow:hidden;
-  display:flex;
-  align-items:stretch;
-  background:#f0f2f7;
-}
-.pv-seg{
-  height:100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:13px;
-  color:#fff;
-  font-weight:600;
-}
-.pv-seg.ndp{background:#f5c02c}  /* NDP */
-.pv-seg.ulp{background:#ed2633}  /* ULP */
-
-/* dotted horizontal line at 50% height */
-.pv-50line{
-  position:absolute;
-  left:0; right:0;
-  top:50%;
-  border-top:1px dotted rgba(0,0,0,0.35);
-  pointer-events:none;
-}
-.pv-50label{
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  top:calc(50% + 6px);
-  font-size:12px;
-  color:var(--muted);
-}
-
-/* Seats */
-#seats{width:260px;height:120px}
-
-/* right column */
-.right{display:flex;flex-direction:column;gap:12px}
-label{font-size:13px;color:var(--muted)}
-.btn{display:none}
-.small{font-size:12px;padding:6px 8px}
-
-footer{margin-top:18px;color:#666;font-size:13px}
-
-/* responsive */
+/* Responsive */
 @media (max-width:980px){
   .layout{grid-template-columns:1fr}
-  #seats{width:240px}
+  .pv-wrap,.seats-wrap{max-width:100%}
 }
