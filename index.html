@@ -10,10 +10,7 @@
   <div class="wrap">
     <header>
       <h1>2025 Election Map</h1>
-      <div class="controls">
-        <input id="svg-file" type="file" accept="image/svg+xml" />
-        <button class="btn" id="reset-map">Reset Map</button>
-      </div>
+      <!-- Controls removed per request -->
     </header>
 
     <!-- Popular Vote + Seats -->
@@ -23,13 +20,19 @@
           <strong>Popular Vote</strong>
           <small id="pv-total" style="color:var(--muted)">0 votes</small>
         </div>
-        <div class="pv-bar" id="pv-bar"></div>
+        <div class="pv-wrap">
+          <div class="pv-50line"></div>
+          <div class="pv-50label">50%</div>
+          <div class="pv-bar" id="pv-bar">
+            <!-- two segments injected by JS -->
+          </div>
+        </div>
       </div>
 
       <div id="seats-wrap" class="card" style="padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center">
         <strong>Seats (of 15)</strong>
-        <svg id="seats" viewBox="0 0 260 80" preserveAspectRatio="xMidYMid meet"></svg>
-        <div id="seat-summary" style="margin-top:6px;font-size:13px;color:var(--muted)">0 / 15 decided</div>
+        <svg id="seats" viewBox="0 0 260 120" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="seat-summary" class="muted">0 / 15 decided</div>
       </div>
     </section>
 
