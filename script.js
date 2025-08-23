@@ -1,11 +1,12 @@
 /************************************************************
- * Election Map — show swing exactly as in results.json
+ * Election Map — declared-first tooltip row + bold values
+ * - Declared row appears first, bolded, and filled with leading color
+ * - Swing shown exactly as in results.json
  * - Two-party declaration model (declared: {NDP, ULP})
- * - Robust SVG binding (marker → shapes) + z-order hover fix
+ * - Robust SVG binding + z-order hover fix
  * - Map coloring: declared colors / leading tints / tie black
  * - Popular vote stack, seat row packing (NDP left, ULP right)
  * - Mobile-safe tooltip clamping; #,### number formatting
- * - Tooltip displays swing strings exactly as in JSON
  ************************************************************/
 
 // ---------- DOM helpers ----------
@@ -18,7 +19,7 @@ const fmtInt = new Intl.NumberFormat('en-US');
 let state = {
   parties: {
     "Unity Labour Party": { color: "#ed2633" },     // ULP declared color
-    "New Democratic Party": { color: "#f5c02c" }   // NDP declared color
+    "New Democratic Party": { color: "#f5c02c" }    // NDP declared color
   },
   leadTint: { ULP: "#f77e81", NDP: "#fedda6" },    // leading but not declared
   districts: {},
@@ -103,11 +104,8 @@ const NAME_TO_LABEL = {
 };
 const canonicalName = raw => ID_TO_NAME[raw] || raw;
 
-// ---------- SVG district mapping (robust) ----------
-/** Map<"NW", Array<paintable elements>> */
+// ---------- SVG district mapping ----------
 let districtTargets = new Map();
-
-// for z-order restore
 const originalOrder = new WeakMap(); // element -> { parent, nextSibling }
 
 function isMarker(el) { return el && el.hasAttribute('id') && el.hasAttribute('data-district'); }
@@ -117,14 +115,13 @@ function isPaintable(el) {
   return t === 'path' || t === 'polygon' || t === 'rect' || t === 'ellipse' || t === 'circle';
 }
 
-/** hover handlers that also handle z-order bring-to-front and restore */
 function attachHover(key, targets) {
   const enter = e => {
     const name = canonicalName(key);
     renderTooltipFor(name);
     showTooltipAt(e.clientX, e.clientY);
 
-    // elevate to front: remember positions and append to parent
+    // bring to front
     targets.forEach(t => {
       if (!originalOrder.has(t)) originalOrder.set(t, { parent: t.parentNode, next: t.nextSibling });
       t.parentNode.appendChild(t);
@@ -133,7 +130,6 @@ function attachHover(key, targets) {
   };
   const leave = () => {
     tooltip.style.display = 'none';
-    // restore original positions
     targets.forEach(t => {
       const rec = originalOrder.get(t);
       if (rec && rec.parent) rec.parent.insertBefore(t, rec.next);
@@ -150,15 +146,12 @@ function attachHover(key, targets) {
   });
 }
 
-/** primary: assign paintables that follow marker order */
 function buildTargetsByOrder(svg) {
   const map = new Map();
   const ordered = Array.from(svg.querySelectorAll('[id][data-district], path, polygon, rect, ellipse, circle'));
-
   let currentKey = null;
   for (let i = 0; i < ordered.length; i++) {
     const el = ordered[i];
-
     if (isMarker(el)) {
       currentKey = el.getAttribute('id') || el.getAttribute('data-district');
       if (!map.has(currentKey)) map.set(currentKey, []);
@@ -176,7 +169,6 @@ function buildTargetsByOrder(svg) {
   return map;
 }
 
-/** fallback: find by inkscape:label equals district label */
 function fallbackByInkscapeLabel(svg, key) {
   const name = canonicalName(key);
   const label = NAME_TO_LABEL[name];
@@ -197,7 +189,6 @@ function fallbackByInkscapeLabel(svg, key) {
   return paints;
 }
 
-/** fallback: heuristic id/class contains label words */
 function fallbackByHeuristic(svg, key) {
   const name = canonicalName(key);
   const words = (NAME_TO_LABEL[name] || name).toLowerCase().split(/\s+/).filter(Boolean);
@@ -215,10 +206,8 @@ function fallbackByHeuristic(svg, key) {
   return paints;
 }
 
-/** Build districtTargets map with fallbacks & attach hover */
 function buildDistrictTargets(svg) {
   districtTargets = buildTargetsByOrder(svg);
-
   const expectedKeys = Object.keys(ID_TO_NAME);
   expectedKeys.forEach(key => {
     if (!districtTargets.has(key) || districtTargets.get(key).length === 0) {
@@ -230,7 +219,6 @@ function buildDistrictTargets(svg) {
       }
     }
   });
-
   districtTargets.forEach((targets, key) => {
     if (!targets || targets.length === 0) {
       console.warn(`[map] No shapes found for district key "${key}".`);
@@ -282,7 +270,7 @@ function showTooltipAt(clientX, clientY){
   tooltip.style.top = top + 'px';
 }
 
-// ---------- Tooltip renderer (uses swing string as-is) ----------
+// ---------- Tooltip renderer (declared row first, bold, filled with leading color) ----------
 function renderTooltipFor(districtName){
   const info = state.districts[districtName] || {
     name: districtName, declared: {NDP:0,ULP:0}, candidates: [], totalVotes: 0
@@ -291,21 +279,54 @@ function renderTooltipFor(districtName){
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
 
+  // Votes to determine current leader color
+  const ndp = candidates.find(c=>c.party==='NDP') || { votes:0 };
+  const ulp = candidates.find(c=>c.party==='ULP') || { votes:0 };
+  const vN = Number(ndp.votes||0), vU = Number(ulp.votes||0);
+  const hasVotes = (vN + vU) > 0;
+  const isTie = hasVotes && vN === vU;
+
+  let leadingColor = '#e9e9e9';
+  if (!isTie) {
+    if (vN > vU) leadingColor = state.leadTint.NDP;
+    else if (vU > vN) leadingColor = state.leadTint.ULP;
+  }
+
+  // Which party (if any) is declared
+  const declaredN = Number(info.declared?.NDP||0) === 1;
+  const declaredU = Number(info.declared?.ULP||0) === 1;
+  let declaredParty = null;
+  if (declaredN && !declaredU) declaredParty = 'NDP';
+  else if (declaredU && !declaredN) declaredParty = 'ULP';
+  else if (declaredN && declaredU) {
+    // both declared -> still bring the higher-vote first if any
+    if (vN > vU) declaredParty = 'NDP';
+    else if (vU > vN) declaredParty = 'ULP';
+  }
+
+  // Order rows: declared party first if exists
+  const order = declaredParty ? [declaredParty, declaredParty === 'NDP' ? 'ULP' : 'NDP'] : ['NDP','ULP'];
+
   const partyColor = p => (state.parties[p] && state.parties[p].color) || '#999';
   const swingClass = s => (typeof s === 'string' && s.trim().startsWith('+'))
     ? 'swing-pos' : (typeof s === 'string' && s.trim().startsWith('-')) ? 'swing-neg' : 'swing-zero';
   const fmtPct = (v, t) => t ? ((v || 0) / t * 100).toFixed(1) : '0.0';
 
-  const rows = candidates.length ? candidates.map(c=>{
+  const rows = order.map(p=>{
+    const c = (p === 'NDP') ? ndp : ulp;
     const pct = fmtPct(c.votes, total);
-    const sw = (c.swing == null || c.swing === "") ? "0.0%" : String(c.swing); // show exactly what JSON has
-    const isDeclaredForParty = (info.declared?.[c.party] === 1 || info.declared?.[c.party] === '1');
+    const sw = (c.swing == null || c.swing === "") ? "0.0%" : String(c.swing);
+    const isDeclaredForParty = (info.declared?.[p] === 1 || info.declared?.[p] === '1');
     const declaredIcon = isDeclaredForParty ? `<img src="Declaration.svg" alt="Declared" class="declared-icon" />` : '';
+
+    const declaredRowClass = (declaredParty === p) ? ' tt-row--declared' : '';
+    const declaredRowStyle = (declaredParty === p) ? ` style="background:${leadingColor}"` : '';
+
     return `
-      <div class="tt-row">
+      <div class="tt-row${declaredRowClass}"${declaredRowStyle}>
         <div class="tt-col party-cell">
-          <span class="party-chip" style="background:${partyColor(c.party)}"></span>
-          <span class="party-name">${c.party}</span>
+          <span class="party-chip" style="background:${partyColor(p)}"></span>
+          <span class="party-name">${p}</span>
         </div>
         <div class="tt-col candidate-cell">
           <span class="candidate-name">${c.name || '—'}</span>
@@ -316,7 +337,7 @@ function renderTooltipFor(districtName){
         <div class="tt-col swing-cell ${swingClass(sw)}">${sw}</div>
       </div>
     `;
-  }).join('') : '<div style="color:var(--muted)">No results yet.</div>';
+  }).join('');
 
   tooltip.innerHTML = `
     <div class="district-name">${info.name || districtName}</div>
@@ -337,7 +358,6 @@ function applyResults(){
   const svg = svgWrapper.querySelector('svg');
   if(!svg) return;
 
-  // Paint each district's shapes
   districtTargets.forEach((targets, key) => {
     if (!targets || !targets.length) return;
 
@@ -385,7 +405,7 @@ function applyResults(){
   renderLastUpdated();
 }
 
-// ---------- Popular vote (2 segments) ----------
+// ---------- Popular vote ----------
 function renderPopularVote(){
   const partyTotals = {};
   let totalVotes = 0;
@@ -420,7 +440,7 @@ function renderPopularVote(){
   qs('#pv-total').textContent = `${fmtInt.format(total || 0)} votes`;
 }
 
-// ---------- Seat row (pack left/right; blanks for no result & ties w/o declaration) ----------
+// ---------- Seat row ----------
 function renderSeatRow(){
   const cont = qs('#seats-row');
   if (!cont) return;
@@ -574,15 +594,14 @@ function mergeResults(data){
         votes = entry;
       } else if (entry && typeof entry === 'object') {
         votes = Number(entry.votes || 0);
-        // USE SWING AS-IS FROM JSON (string); default "0.0%"
         if (entry.swing != null && entry.swing !== "") {
-  swingStr = String(entry.swing).replace(/^\-\+/, "-");
-}
+          swingStr = String(entry.swing);
+        }
       }
       const cand = (d.candidates || []).find(c=>c.party === partyKey);
       if (cand) {
         cand.votes = votes;
-        cand.swing = swingStr;
+        cand.swing = swingStr; // as-is from JSON
       }
     };
 
@@ -622,4 +641,3 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
-
