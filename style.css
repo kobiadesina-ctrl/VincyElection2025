@@ -32,7 +32,7 @@ h1{font-size:20px;margin:0}
   width:100%;
   max-width:720px;            /* fixed visual cap so seats row matches */
   margin:0 auto 10px auto;
-  padding-top:30px;           /* space ABOVE the bar for 50% marker */
+  padding-top:38px;           /* space ABOVE the bar for label + caret + dotted line */
 }
 .pv-bar{
   position:relative;
@@ -55,31 +55,32 @@ h1{font-size:20px;margin:0}
 .pv-seg.ndp{background:#f5c02c}  /* NDP declared color */
 .pv-seg.ulp{background:#ed2633}  /* ULP declared color */
 
-/* 50% vertical marker ABOVE the bar only */
+/* 50% vertical marker ABOVE the bar only (line lowest, caret above, label above caret) */
 .pv-50vline{
   position:absolute;
   left:50%;
   width:0;
   bottom:40px;                /* sits exactly above the bar (bar is 40px tall) */
-  height:12px;                /* only above, not below */
+  height:10px;                /* only above, not below */
   border-left:2px dotted rgba(0,0,0,0.35);
   pointer-events:none;
-}
-.pv-50label-top{
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  bottom:40px;                /* reference bar top */
-  margin-bottom:18px;         /* label sits highest */
-  font-size:12px;
-  color:var(--muted);
 }
 .pv-50caret{
   position:absolute;
   left:50%;
   transform:translateX(-50%);
   bottom:40px;                /* reference bar top */
-  margin-bottom:14px;         /* caret sits just above the dotted line */
+  margin-bottom:12px;         /* caret sits just above the dotted line */
+  font-size:12px;
+  color:var(--muted);
+  line-height:1;
+}
+.pv-50label-top{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:40px;                /* reference bar top */
+  margin-bottom:26px;         /* label sits above caret */
   font-size:12px;
   color:var(--muted);
 }
@@ -105,41 +106,47 @@ h1{font-size:20px;margin:0}
 }
 .seat-summary{margin-top:8px}
 
-/* LEGEND - basic list of parties (declared colors) */
+/* LEGEND */
 .right{display:flex;flex-direction:column;gap:12px}
 label{font-size:13px;color:var(--muted)}
 
-/* New compact legend matrix for Declared vs Leading */
+/* New compact legend matrix for Declared vs Leading with angled headings */
 .legend-matrix{
   margin-top:8px;
   display:grid;
-  grid-template-columns: 1fr auto auto;
-  align-items:center;
+  grid-template-columns: auto 1fr;
   gap:8px 12px;
+  align-items:center;
 }
 .lm-head{
-  grid-row: 1;
+  grid-column: 1 / span 1;
   font-size:12px;
   color:#555;
   transform-origin:left bottom;
-  transform:rotate(-24deg);   /* angle headings so the two columns sit closer */
-  margin-left:8px;
+  transform:rotate(-24deg);   /* angle headings so the two swatches can be tight */
+  margin-left:26px;           /* nudge so it sits above swatches */
 }
-.lm-declared{grid-column:2}
-.lm-leading{grid-column:3}
+.lm-declared{ margin-top:-2px; }
+.lm-leading{ margin-top:16px; } /* staggered so both words fit above 2 squares */
+
 .lm-row{
-  display:contents; /* allow name + two swatches to align in grid */
+  display:contents;
+}
+.lm-swatches{
+  display:grid;
+  grid-template-columns: repeat(2, 18px);
+  gap:8px;                    /* normal/tight space between the two squares */
+  justify-content:start;
+  align-items:center;
 }
 .lm-name{
   font-size:13px;
   color:#222;
-  padding:4px 0;
 }
 .lm-swatch{
   width:18px; height:18px;
   border-radius:4px;
   box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);
-  justify-self:center;
 }
 .ulp-declared{background:#ed2633}
 .ulp-leading{background:#f77e81}
@@ -178,7 +185,16 @@ label{font-size:13px;color:var(--muted)}
 .tt-col{min-width:0}
 .party-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .party-chip{width:12px;height:12px;border-radius:3px;flex-shrink:0}
-.candidate-cell .candidate-name{font-weight:600;font-size:13px;line-height:1}
+.candidate-cell{
+  display:flex;align-items:center;gap:6px;
+}
+.candidate-name{font-weight:600;font-size:13px;line-height:1}
+.declared-badge{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid #1a7f37; color:#1a7f37;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:11px; line-height:1;
+}
 .votes-cell, .share-cell, .swing-cell{text-align:right;font-size:13px}
 .votes-cell, .share-cell{color:var(--muted)}
 .swing-cell{font-weight:600}
@@ -187,7 +203,7 @@ label{font-size:13px;color:var(--muted)}
 .swing-zero{color:var(--muted)}
 .tt-total{margin-top:8px;color:var(--muted);font-size:12px}
 
-/* Map hover effect */
+/* Map hover effect (applied to actual shapes) */
 .district-hover{stroke:#000 !important;stroke-width:2.5px !important}
 
 /* Responsive */
