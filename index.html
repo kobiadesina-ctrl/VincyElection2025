@@ -58,29 +58,30 @@
         <div class="card">
           <label>Legend</label>
 
-          <!-- New compact legend matrix -->
+          <!-- Legend grid: Party name | Declared | Leading -->
           <div class="legend-matrix">
+            <div class="lm-blank"></div>
             <div class="lm-head lm-declared">Declared</div>
             <div class="lm-head lm-leading">Leading</div>
 
             <div class="lm-row">
-              <div class="lm-swatches">
-                <span class="lm-swatch ulp-declared"></span>
-                <span class="lm-swatch ulp-leading"></span>
-              </div>
               <div class="lm-name">Unity Labour Party</div>
+              <div class="lm-swatch ulp-declared" title="ULP Declared"></div>
+              <div class="lm-swatch ulp-leading" title="ULP Leading"></div>
             </div>
 
             <div class="lm-row">
-              <div class="lm-swatches">
-                <span class="lm-swatch ndp-declared"></span>
-                <span class="lm-swatch ndp-leading"></span>
-              </div>
               <div class="lm-name">New Democratic Party</div>
+              <div class="lm-swatch ndp-declared" title="NDP Declared"></div>
+              <div class="lm-swatch ndp-leading" title="NDP Leading"></div>
             </div>
           </div>
+        </div>
 
-          <div class="legend-note">
+        <!-- Swing infobox -->
+        <div class="card swing-info">
+          <div class="swing-title">About Swing</div>
+          <div class="swing-text">
             <strong>Swing</strong> shows how vote share has changed compared with the
             <em>same polling divisions</em> that have reported so far (vs 2020). As more divisions report,
             the swing recalculates using only those areas.
