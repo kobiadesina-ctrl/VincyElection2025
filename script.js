@@ -48,8 +48,8 @@ function seedCandidates(){
       state.districts[name] = {
         name,
         candidates: [
-          { party: "NDP", name: pair.NDP, votes: 0 },
-          { party: "ULP", name: pair.ULP, votes: 0 },
+          { party: "NDP", name: pair.NDP, votes: 0, swing: "0.0%" },
+          { party: "ULP", name: pair.ULP, votes: 0, swing: "0.0%" },
         ],
         totalVotes: 0
       };
@@ -78,7 +78,6 @@ const ID_TO_NAME = {
   CL: "Central Leeward",
   MQ: "Marriaqua",
 };
-
 const canonicalName = raw => ID_TO_NAME[raw] || raw;
 
 // --------------------
@@ -146,7 +145,7 @@ function onDistrictMove(e, el){
 }
 
 // --------------------
-// Tooltip renderer (no logos; always table)
+// Tooltip renderer (adds Swing column)
 // --------------------
 function renderTooltipFor(districtId){
   const nameKey = canonicalName(districtId);
@@ -157,8 +156,8 @@ function renderTooltipFor(districtId){
     info = cfg ? {
       name: nameKey,
       candidates: [
-        { party: "NDP", name: cfg.NDP, votes: 0 },
-        { party: "ULP", name: cfg.ULP, votes: 0 }
+        { party: "NDP", name: cfg.NDP, votes: 0, swing: "0.0%" },
+        { party: "ULP", name: cfg.ULP, votes: 0, swing: "0.0%" }
       ],
       totalVotes: 0
     } : { name: nameKey, candidates: [], totalVotes: 0 };
@@ -172,9 +171,21 @@ function renderTooltipFor(districtId){
     short: p
   });
 
+  const swingClass = (s) => s?.trim().startsWith('+') ? 'swing-pos' : (s?.trim().startsWith('-') ? 'swing-neg' : 'swing-zero');
+  const fmtSwing = (s) => {
+    if (typeof s !== 'string') return '0.0%';
+    const t = s.trim();
+    if (t === '0' || t === '0%' || t === '+0%' || t === '-0%') return '0.0%';
+    // ensure one decimal and % if possible
+    const m = t.match(/^([+\-]?)(\d+(\.\d+)?)/);
+    if (m) return `${m[1] || (parseFloat(m[2])===0 ? '' : '+')}${(+m[2]).toFixed(1)}%`;
+    return t;
+  };
+
   const rows = candidates.length ? candidates.map(c=>{
     const meta = partyMeta(c.party || '—');
     const pct = total ? ((c.votes||0)/total*100).toFixed(1) : '0.0';
+    const sw = fmtSwing(c.swing);
     return `
       <div class="tt-row">
         <div class="tt-col party-cell">
@@ -186,6 +197,7 @@ function renderTooltipFor(districtId){
         </div>
         <div class="tt-col votes-cell">${c.votes || 0}</div>
         <div class="tt-col share-cell">${pct}%</div>
+        <div class="tt-col swing-cell ${swingClass(sw)}">${sw}</div>
       </div>
     `;
   }).join('') : '<div style="color:var(--muted)">No results yet.</div>';
@@ -197,6 +209,7 @@ function renderTooltipFor(districtId){
       <div class="tt-col">Candidate</div>
       <div class="tt-col">Votes</div>
       <div class="tt-col">Share</div>
+      <div class="tt-col">Swing</div>
     </div>
     ${rows}
     <div class="tt-total">Total votes: ${total}</div>
@@ -295,17 +308,15 @@ function renderSeats(){
 
   const decided = seatData.filter(s=>s.party).length;
 
-  // Hemicycle coordinates: place N points along a semicircle
+  // Hemicycle coordinates: N points along a semicircle
   const N = total;
   const centerX = 130;
   const centerY = 110;   // bottom center
-  const radius = 90;     // outer radius for seats
-  const seatR = 10;      // circle radius
-  // Spread angles from 180° to 0° (left to right)
+  const radius = 90;     // outer radius
+  const seatR = 10;
   for(let i=0;i<N;i++){
-    const t = (N === 1) ? 0.5 : i/(N-1); // normalized 0..1
-    const angDeg = 180 - t*180;
-    const ang = angDeg * Math.PI/180;
+    const t = (N === 1) ? 0.5 : i/(N-1);
+    const ang = (Math.PI) - (t*Math.PI); // 180°..0°
     const x = centerX + radius * Math.cos(ang);
     const y = centerY - radius * Math.sin(ang);
     const seat = seatData[i];
@@ -363,7 +374,75 @@ function renderLegend(){
 }
 
 // --------------------
-// Init (auto-load map.svg; no file inputs)
+// Results polling (Option A): results.json
+// --------------------
+const RESULTS_URL = 'results.json';
+const POLL_MS = 7000;
+
+function normalizeSwing(val){
+  if (val == null) return "0.0%";
+  if (typeof val === 'string') {
+    const m = val.trim().match(/^([+\-]?)(\d+(\.\d+)?)/);
+    if (!m) return "0.0%";
+    const sign = m[1] || (parseFloat(m[2])===0 ? '' : '+');
+    return `${sign}${(+m[2]).toFixed(1)}%`;
+  }
+  if (typeof val === 'number') {
+    const sign = val === 0 ? '' : (val > 0 ? '+' : '');
+    return `${sign}${Math.abs(val).toFixed(1)}%`;
+  }
+  return "0.0%";
+}
+
+function mergeResults(data){
+  if(!data || !data.districts) return;
+
+  Object.entries(data.districts).forEach(([rawName, row])=>{
+    const name = canonicalName(rawName);
+    const d = state.districts[name];
+    if(!d) return;
+
+    const setParty = (partyKey) => {
+      const entry = row[partyKey];
+      let votes = 0, swing = "0.0%";
+      if (typeof entry === 'number') {
+        votes = entry;
+      } else if (entry && typeof entry === 'object') {
+        votes = Number(entry.votes || 0);
+        swing = normalizeSwing(entry.swing);
+      }
+      const cand = (d.candidates || []).find(c=>c.party === partyKey);
+      if (cand) {
+        cand.votes = votes;
+        cand.swing = swing;
+      }
+    };
+
+    setParty("NDP");
+    setParty("ULP");
+
+    d.totalVotes = (d.candidates||[]).reduce((s,c)=> s + (c.votes||0), 0);
+  });
+}
+
+function startResultsPolling(){
+  const tick = () => {
+    fetch(`${RESULTS_URL}?t=${Date.now()}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (json) {
+          mergeResults(json);
+          applyResults();
+        }
+      })
+      .catch(()=>{})
+      .finally(()=> setTimeout(tick, POLL_MS));
+  };
+  tick();
+}
+
+// --------------------
+// Init (auto-load map.svg; start polling)
 // --------------------
 document.addEventListener('DOMContentLoaded', ()=>{
   // 1) Use inline <svg> if present
@@ -377,4 +456,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       .then(text => { if (text) loadSVG(text); })
       .catch(() => {/* no default map found */});
   }
+
+  // Start polling for results.json
+  startResultsPolling();
 });
