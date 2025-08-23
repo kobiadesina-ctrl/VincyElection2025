@@ -26,13 +26,13 @@
 
         <!-- Popular vote stack (fixed width container) -->
         <div class="pv-wrap">
-          <!-- vertical 50% marker -->
-          <div class="pv-50vline"></div>
+          <!-- 50% marker above the bar ONLY -->
+          <div class="pv-50vline" aria-hidden="true"></div>
           <div class="pv-50label-top">50%</div>
-          <div class="pv-50caret">▼</div>
+          <div class="pv-50caret" aria-hidden="true">▼</div>
 
           <div class="pv-bar" id="pv-bar">
-            <!-- two segments injected by JS -->
+            <!-- segments injected by JS -->
           </div>
         </div>
 
@@ -58,10 +58,28 @@
         <div class="card">
           <label>Legend</label>
           <div id="legend" style="margin-top:8px"></div>
+
+          <div class="legend-matrix">
+            <div class="lm-head lm-declared">Declared</div>
+            <div class="lm-head lm-leading">Leading</div>
+
+            <div class="lm-row">
+              <div class="lm-name">Unity Labour Party</div>
+              <div class="lm-swatch ulp-declared"></div>
+              <div class="lm-swatch ulp-leading"></div>
+            </div>
+
+            <div class="lm-row">
+              <div class="lm-name">New Democratic Party</div>
+              <div class="lm-swatch ndp-declared"></div>
+              <div class="lm-swatch ndp-leading"></div>
+            </div>
+          </div>
+
           <div class="legend-note">
-            <strong>Swing</strong> shows the change in vote share compared with the
-            <em>same polling divisions</em> that have reported so far, versus their 2020 results.
-            As more divisions are called, the swing re-calculates to reflect only those areas.
+            <strong>Swing</strong> shows how vote share has changed compared with the
+            <em>same polling divisions</em> that have reported so far (vs 2020). As more divisions report,
+            the swing recalculates using only those areas.
           </div>
         </div>
       </aside>
