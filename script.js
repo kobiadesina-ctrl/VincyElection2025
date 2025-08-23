@@ -1,7 +1,11 @@
 /************************************************************
- * Election Map — two-party declaration model (Y/AA),
- * robust binding, coloring, z-order, legend, popular vote marker,
- * #,### formatting, mobile-safe tooltip clamping, declaration icon.
+ * Election Map — show swing exactly as in results.json
+ * - Two-party declaration model (declared: {NDP, ULP})
+ * - Robust SVG binding (marker → shapes) + z-order hover fix
+ * - Map coloring: declared colors / leading tints / tie black
+ * - Popular vote stack, seat row packing (NDP left, ULP right)
+ * - Mobile-safe tooltip clamping; #,### number formatting
+ * - Tooltip displays swing strings exactly as in JSON
  ************************************************************/
 
 // ---------- DOM helpers ----------
@@ -13,10 +17,10 @@ const fmtInt = new Intl.NumberFormat('en-US');
 // ---------- Global state ----------
 let state = {
   parties: {
-    "Unity Labour Party": { color: "#ed2633" }, // ULP declared color
-    "New Democratic Party": { color: "#f5c02c" } // NDP declared color
+    "Unity Labour Party": { color: "#ed2633" },     // ULP declared color
+    "New Democratic Party": { color: "#f5c02c" }   // NDP declared color
   },
-  leadTint: { ULP: "#f77e81", NDP: "#fedda6" }, // leading but not declared
+  leadTint: { ULP: "#f77e81", NDP: "#fedda6" },    // leading but not declared
   districts: {},
   totalSeats: 15,
   lastUpdated: null
@@ -265,16 +269,12 @@ function showTooltipAt(clientX, clientY){
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  // default to right/below cursor
   let left = clientX + 12;
   let top = clientY + 12;
 
-  // flip horizontally if overflow
   if (left + tw + pad > vw) left = clientX - tw - 12;
-  // flip vertically if overflow
   if (top + th + pad > vh) top = clientY - th - 12;
 
-  // clamp inside viewport
   left = Math.max(pad, Math.min(left, vw - tw - pad));
   top  = Math.max(pad, Math.min(top,  vh - th - pad));
 
@@ -282,7 +282,7 @@ function showTooltipAt(clientX, clientY){
   tooltip.style.top = top + 'px';
 }
 
-// ---------- Tooltip renderer (declared icon, #,### votes) ----------
+// ---------- Tooltip renderer (uses swing string as-is) ----------
 function renderTooltipFor(districtName){
   const info = state.districts[districtName] || {
     name: districtName, declared: {NDP:0,ULP:0}, candidates: [], totalVotes: 0
@@ -291,26 +291,14 @@ function renderTooltipFor(districtName){
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
 
-  // winner by votes (not necessarily declared)
-  let winnerParty = null;
-  if (candidates.length) {
-    const sorted = [...candidates].sort((a,b)=> (b.votes||0)-(a.votes||0));
-    if ((sorted[0].votes||0) > (sorted[1]?.votes||0)) winnerParty = sorted[0].party;
-  }
-
   const partyColor = p => (state.parties[p] && state.parties[p].color) || '#999';
-  const swingClass = s => s?.trim().startsWith('+') ? 'swing-pos' : (s?.trim().startsWith('-') ? 'swing-neg' : 'swing-zero');
+  const swingClass = s => (typeof s === 'string' && s.trim().startsWith('+'))
+    ? 'swing-pos' : (typeof s === 'string' && s.trim().startsWith('-')) ? 'swing-neg' : 'swing-zero';
   const fmtPct = (v, t) => t ? ((v || 0) / t * 100).toFixed(1) : '0.0';
-  const normSwing = s => {
-    if (typeof s !== 'string') return '0.0%';
-    const m = s.trim().match(/^([+\-]?)(\d+(\.\d+)?)/);
-    if (m) return `${m[1] || (parseFloat(m[2]) === 0 ? '' : '+')}${(+m[2]).toFixed(1)}%`;
-    return '0.0%';
-  };
 
   const rows = candidates.length ? candidates.map(c=>{
     const pct = fmtPct(c.votes, total);
-    const sw = normSwing(c.swing);
+    const sw = (c.swing == null || c.swing === "") ? "0.0%" : String(c.swing); // show exactly what JSON has
     const isDeclaredForParty = (info.declared?.[c.party] === 1 || info.declared?.[c.party] === '1');
     const declaredIcon = isDeclaredForParty ? `<img src="Declaration.svg" alt="Declared" class="declared-icon" />` : '';
     return `
@@ -375,10 +363,10 @@ function applyResults(){
       } else if (declaredU && !declaredN) {
         fillColor = state.parties['ULP']?.color || '#999';
       } else if (declaredN && declaredU) {
-        // contradictory; choose higher votes if any, else default grey
+        // contradictory; choose higher votes if any, else black
         if (vN > vU) fillColor = state.parties['NDP']?.color || '#999';
         else if (vU > vN) fillColor = state.parties['ULP']?.color || '#999';
-        else fillColor = '#000000'; // both declared but tie -> black
+        else fillColor = '#000000';
       } else {
         // no declaration: use leading tint if any
         if (!hasVotes) fillColor = targets[0].dataset.origfill || '#d7d7d7';
@@ -432,7 +420,7 @@ function renderPopularVote(){
   qs('#pv-total').textContent = `${fmtInt.format(total || 0)} votes`;
 }
 
-// ---------- Seat row (pack left/right; blanks center) ----------
+// ---------- Seat row (pack left/right; blanks for no result & ties w/o declaration) ----------
 function renderSeatRow(){
   const cont = qs('#seats-row');
   if (!cont) return;
@@ -450,39 +438,32 @@ function renderSeatRow(){
 
     const hasVotes = (vN+vU)>0;
     const isTie = vN === vU && hasVotes;
-    if (!hasVotes) return;           // no result -> blank
+    if (!hasVotes) return;                          // no result -> blank
     if (isTie && !declaredN && !declaredU) return; // tie w/o declaration -> blank
 
     const lead = Math.abs(vN - vU);
 
-    // Determine which party this seat belongs to on the row:
-    // priority: declared party if any; else leading party
-    let bucket = null;
-    let color, declaredFlag=false, party=null, labelParty=null;
-
+    // seat belongs to declared party if declared, else leader
+    let party = null, declaredFlag=false, color;
     if (declaredN && !declaredU) { party='NDP'; declaredFlag=true; color=state.parties['NDP']?.color||'#999'; }
     else if (declaredU && !declaredN) { party='ULP'; declaredFlag=true; color=state.parties['ULP']?.color||'#999'; }
     else if (declaredN && declaredU) {
-      // contradictory: choose higher votes else mark tie (skip)
       if (vN > vU) { party='NDP'; declaredFlag=true; color=state.parties['NDP']?.color||'#999'; }
       else if (vU > vN) { party='ULP'; declaredFlag=true; color=state.parties['ULP']?.color||'#999'; }
-      else return; // both declared and tie -> skip from seat row
+      else return; // both declared & tie -> skip
     } else {
-      // no declarations: use leader if not tie
       if (vN > vU) { party='NDP'; color=state.leadTint.NDP; }
       else if (vU > vN) { party='ULP'; color=state.leadTint.ULP; }
-      else return; // tie but has votes => skip (stays blank)
+      else return; // tie but not declared -> skip
     }
 
-    // Prepare tooltip lines per spec
-    const declaredText = declaredN ? 'NDP' : (declaredU ? 'ULP' : null);
+    // tooltip lines
     let tipLines = [];
-    if (declaredText && ((party==='NDP' && vN>=vU) || (party==='ULP' && vU>=vN))) {
-      // declared and currently leading (or equal) for that party
-      tipLines.push(`${declaredText} victory +${fmtInt.format(lead)}`);
-    } else if (declaredText) {
-      tipLines.push(`${declaredText} victory`);
-      // leader may be opposite if not tie
+    const declText = declaredN ? 'NDP' : (declaredU ? 'ULP' : null);
+    if (declText && ((party==='NDP' && vN>=vU) || (party==='ULP' && vU>=vN))) {
+      tipLines.push(`${declText} victory +${fmtInt.format(lead)}`);
+    } else if (declText) {
+      tipLines.push(`${declText} victory`);
       if (!isTie) {
         const leadingText = (vN > vU) ? 'NDP' : 'ULP';
         tipLines.push(`${leadingText} leading +${fmtInt.format(lead)}`);
@@ -494,10 +475,7 @@ function renderSeatRow(){
       else tipLines.push(`${party} leading +${fmtInt.format(lead)}`);
     }
 
-    const seatObj = {
-      district: d.name || id, party, declared: declaredFlag, lead, color, tipLines
-    };
-
+    const seatObj = { district: d.name || id, party, declared: declaredFlag, lead, color, tipLines };
     if (party === 'NDP') ndpSeats.push(seatObj);
     else ulpSeats.push(seatObj);
   });
@@ -562,21 +540,6 @@ function renderLastUpdated(){
 const RESULTS_URL = 'results.json';
 const POLL_MS = 7000;
 
-function normalizeSwing(val){
-  if (val == null) return "0.0%";
-  if (typeof val === 'string') {
-    const m = val.trim().match(/^([+\-]?)(\d+(\.\d+)?)/);
-    if (!m) return "0.0%";
-    const sign = m[1] || (parseFloat(m[2])===0 ? '' : '+');
-    return `${sign}${(+m[2]).toFixed(1)}%`;
-  }
-  if (typeof val === 'number') {
-    const sign = val === 0 ? '' : (val > 0 ? '+' : '');
-    return `${sign}${Math.abs(val).toFixed(1)}%`;
-  }
-  return "0.0%";
-}
-
 function mergeResults(data){
   if(!data || !data.districts) return;
 
@@ -587,18 +550,17 @@ function mergeResults(data){
     const d = state.districts[name];
     if(!d) return;
 
-    // New two-column declaration model:
+    // Two-column declaration model:
     if (row.declared && typeof row.declared === 'object') {
       d.declared = {
         NDP: Number(row.declared.NDP || 0),
         ULP: Number(row.declared.ULP || 0)
       };
     } else {
-      // backward compatibility (if old {declared: 0/1} arrives)
+      // backward compatibility (single numeric)
       const single = Number(row.declared || 0);
       d.declared = { NDP: 0, ULP: 0 };
       if (single === 1) {
-        // pick winner by votes if present
         const nVotes = Number((row.NDP && row.NDP.votes) || 0);
         const uVotes = Number((row.ULP && row.ULP.votes) || 0);
         if (nVotes >= uVotes) d.declared.NDP = 1; else d.declared.ULP = 1;
@@ -607,17 +569,18 @@ function mergeResults(data){
 
     const setParty = (partyKey) => {
       const entry = row[partyKey];
-      let votes = 0, swing = "0.0%";
+      let votes = 0, swingStr = "0.0%";
       if (typeof entry === 'number') {
         votes = entry;
       } else if (entry && typeof entry === 'object') {
         votes = Number(entry.votes || 0);
-        swing = normalizeSwing(entry.swing);
+        // USE SWING AS-IS FROM JSON (string); default "0.0%"
+        if (entry.swing != null && entry.swing !== "") swingStr = String(entry.swing);
       }
       const cand = (d.candidates || []).find(c=>c.party === partyKey);
       if (cand) {
         cand.votes = votes;
-        cand.swing = swing;
+        cand.swing = swingStr;
       }
     };
 
