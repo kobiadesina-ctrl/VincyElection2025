@@ -146,13 +146,11 @@ function onDistrictMove(e, el){
 }
 
 // --------------------
-// Tooltip renderer (always renders default layout)
+// Tooltip renderer (no logos; always table)
 // --------------------
 function renderTooltipFor(districtId){
-  // Normalize (e.g., "NW" -> "North Windward")
   const nameKey = canonicalName(districtId);
 
-  // Prefer seeded data; if missing, synthesize from CANDIDATE_CONFIG so we never show "No data"
   let info = state.districts[nameKey];
   if(!info){
     const cfg = CANDIDATE_CONFIG && CANDIDATE_CONFIG[nameKey];
@@ -169,24 +167,14 @@ function renderTooltipFor(districtId){
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
 
-  // Party meta + logos
-  const partyMeta = (p) => {
-    const meta = {
-      color: (state.parties[p] && state.parties[p].color) || '#999',
-      short: p,
-      logo: null
-    };
-    if (p === 'NDP') meta.logo = 'NDP logo.png';
-    if (p === 'ULP') meta.logo = 'ULP logo.png';
-    return meta;
-  };
+  const partyMeta = (p) => ({
+    color: (state.parties[p] && state.parties[p].color) || '#999',
+    short: p
+  });
 
   const rows = candidates.length ? candidates.map(c=>{
     const meta = partyMeta(c.party || '—');
     const pct = total ? ((c.votes||0)/total*100).toFixed(1) : '0.0';
-    const logoImg = meta.logo
-      ? `<img class="party-logo" src="${meta.logo}" alt="${c.party} logo" />`
-      : '';
     return `
       <div class="tt-row">
         <div class="tt-col party-cell">
@@ -194,7 +182,7 @@ function renderTooltipFor(districtId){
           <span class="party-name">${meta.short}</span>
         </div>
         <div class="tt-col candidate-cell">
-          ${logoImg}<span class="candidate-name">${c.name || '—'}</span>
+          <span class="candidate-name">${c.name || '—'}</span>
         </div>
         <div class="tt-col votes-cell">${c.votes || 0}</div>
         <div class="tt-col share-cell">${pct}%</div>
@@ -241,7 +229,7 @@ function applyResults(){
   renderLegend();
 }
 
-// Popular vote bar
+// Popular vote: 2-segment stacked bar (NDP left, ULP right) with 50% dotted line
 function renderPopularVote(){
   const partyTotals = {};
   let totalVotes = 0;
@@ -251,29 +239,37 @@ function renderPopularVote(){
       totalVotes += (c.votes||0);
     });
   });
+
+  const ndpVotes = partyTotals["NDP"] || 0;
+  const ulpVotes = partyTotals["ULP"] || 0;
+  const total = totalVotes || (ndpVotes + ulpVotes);
+  const ndpPct = total ? (ndpVotes/total*100) : 0;
+  const ulpPct = total ? (ulpVotes/total*100) : 0;
+
   const pvBar = qs('#pv-bar'); pvBar.innerHTML = '';
-  Object.keys(state.parties).forEach(p=>{
-    const v = partyTotals[p] || 0;
-    const w = totalVotes ? (v/totalVotes*100) : 0;
-    if(w>0){
-      const seg = document.createElement('div');
-      seg.className = 'pv-seg';
-      seg.style.width = w + '%';
-      seg.style.background = state.parties[p].color || '#999';
-      seg.textContent = Math.round(w) + '%';
-      seg.title = p + ': ' + v + ' votes';
-      pvBar.appendChild(seg);
-    }
-  });
-  qs('#pv-total').textContent = totalVotes + ' votes';
+
+  const ndpSeg = document.createElement('div');
+  ndpSeg.className = 'pv-seg ndp';
+  ndpSeg.style.width = ndpPct + '%';
+  ndpSeg.textContent = ndpPct.toFixed(1) + '%';
+
+  const ulpSeg = document.createElement('div');
+  ulpSeg.className = 'pv-seg ulp';
+  ulpSeg.style.width = ulpPct + '%';
+  ulpSeg.textContent = ulpPct.toFixed(1) + '%';
+
+  pvBar.appendChild(ndpSeg);
+  pvBar.appendChild(ulpSeg);
+
+  qs('#pv-total').textContent = (totalVotes || 0) + ' votes';
 }
 
-// Seats widget
+// Seats widget: hemicycle (true semicircle) with 15 seats
 function renderSeats(){
   const svg = qs('#seats'); svg.innerHTML = '';
   const total = state.totalSeats || 15;
 
-  // build seat data with winner info and lead margin
+  // Build seat data
   const districts = Object.entries(state.districts)
     .sort((a,b)=> (a[1].name||a[0]).localeCompare(b[1].name||b[0]));
   const seatData = [];
@@ -296,52 +292,54 @@ function renderSeats(){
     }
   });
   while(seatData.length < total) seatData.push({color:'#d7d7d7'});
+
   const decided = seatData.filter(s=>s.party).length;
 
-  // arrange seats in semicircle: rows 5-4-3-2-1
-  const rows = [5,4,3,2,1];
-  const radius = 10;
+  // Hemicycle coordinates: place N points along a semicircle
+  const N = total;
   const centerX = 130;
-  const spacingX = 20;
-  const spacingY = 14;
-  const startY = radius + (rows.length-1)*spacingY;
-  let idx = 0;
-  for(let r=0;r<rows.length && idx<total;r++){
-    const n = rows[r];
-    const y = startY - r*spacingY;
-    for(let i=0;i<n && idx<total;i++,idx++){
-      const seat = seatData[idx];
-      const x = centerX + (i - (n-1)/2)*spacingX;
-      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      c.setAttribute('cx', x);
-      c.setAttribute('cy', y);
-      c.setAttribute('r', radius);
-      c.setAttribute('fill', seat.color);
-      c.setAttribute('stroke', '#fff');
-      if(seat.district){
-        c.style.cursor = 'pointer';
-        c.addEventListener('mouseenter', e=>{
-          const text = seat.party
-            ? `<div class="district-name">${seat.district}</div>${seat.party} +${seat.lead} votes`
-            : `<div class="district-name">${seat.district}</div><div style="color:var(--muted)">No results</div>`;
-          tooltip.innerHTML = text;
-          tooltip.style.display = 'block';
-          onDistrictMove(e);
-        });
-        c.addEventListener('mousemove', e=>onDistrictMove(e));
-        c.addEventListener('mouseleave', ()=>{ tooltip.style.display='none'; });
-      }
-      svg.appendChild(c);
+  const centerY = 110;   // bottom center
+  const radius = 90;     // outer radius for seats
+  const seatR = 10;      // circle radius
+  // Spread angles from 180° to 0° (left to right)
+  for(let i=0;i<N;i++){
+    const t = (N === 1) ? 0.5 : i/(N-1); // normalized 0..1
+    const angDeg = 180 - t*180;
+    const ang = angDeg * Math.PI/180;
+    const x = centerX + radius * Math.cos(ang);
+    const y = centerY - radius * Math.sin(ang);
+    const seat = seatData[i];
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx', x.toFixed(2));
+    c.setAttribute('cy', y.toFixed(2));
+    c.setAttribute('r', seatR);
+    c.setAttribute('fill', seat.color);
+    c.setAttribute('stroke', '#fff');
+    if(seat.district){
+      c.style.cursor = 'pointer';
+      c.addEventListener('mouseenter', e=>{
+        const text = seat.party
+          ? `<div class="district-name">${seat.district}</div>${seat.party} +${seat.lead} votes`
+          : `<div class="district-name">${seat.district}</div><div style="color:var(--muted)">No results</div>`;
+        tooltip.innerHTML = text;
+        tooltip.style.display = 'block';
+        onDistrictMove(e);
+      });
+      c.addEventListener('mousemove', e=>onDistrictMove(e));
+      c.addEventListener('mouseleave', ()=>{ tooltip.style.display='none'; });
     }
+    svg.appendChild(c);
   }
+
   qs('#seat-summary').textContent = decided + ' / ' + total + ' decided';
 }
 
-// Legend
+// Legend: show only full party names (no short codes)
 function renderLegend(){
   const legend = qs('#legend'); legend.innerHTML = '';
-  Object.keys(state.parties).forEach(p=>{
-    const color = state.parties[p].color || '#999';
+  const fullNames = ["Unity Labour Party", "New Democratic Party"];
+  fullNames.forEach(p=>{
+    const color = (state.parties[p] && state.parties[p].color) || '#999';
     const row = document.createElement('div');
     row.style.display = 'flex';
     row.style.alignItems='center';
@@ -365,53 +363,18 @@ function renderLegend(){
 }
 
 // --------------------
-// File input + reset
-// --------------------
-function bindUI(){
-  const fileInput = qs('#svg-file');
-  const resetBtn = qs('#reset-map');
-
-  if(fileInput){
-    fileInput.addEventListener('change', (e)=>{
-      const f = e.target.files && e.target.files[0];
-      if(!f) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const text = String(ev.target.result);
-        loadSVG(text);
-      };
-      reader.readAsText(f);
-    });
-  }
-
-  if(resetBtn){
-    resetBtn.addEventListener('click', ()=>{
-      // zero out votes but keep candidates
-      Object.values(state.districts).forEach(d=>{
-        d.totalVotes = 0;
-        (d.candidates||[]).forEach(c=> c.votes = 0);
-      });
-      applyResults();
-    });
-  }
-}
-
-// --------------------
-// Init (auto-load map.svg if present)
+// Init (auto-load map.svg; no file inputs)
 // --------------------
 document.addEventListener('DOMContentLoaded', ()=>{
-  bindUI();
-
   // 1) Use inline <svg> if present
   const inlineSVG = svgWrapper.querySelector('svg');
   if (inlineSVG) {
     loadSVG(inlineSVG.outerHTML);
-    return;
+  } else {
+    // 2) Otherwise, auto-load default map.svg from same folder
+    fetch('map.svg', { cache: 'no-store' })
+      .then(res => res.ok ? res.text() : null)
+      .then(text => { if (text) loadSVG(text); })
+      .catch(() => {/* no default map found */});
   }
-
-  // 2) Otherwise, auto-load default map.svg from same folder
-  fetch('map.svg', { cache: 'no-store' })
-    .then(res => res.ok ? res.text() : null)
-    .then(text => { if (text) loadSVG(text); })
-    .catch(() => {/* user can upload manually */});
 });
