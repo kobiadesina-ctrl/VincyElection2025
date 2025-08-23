@@ -11,7 +11,7 @@ let state = {
     "Unity Labour Party": { color: "#ed2633" }, // declared color
     "New Democratic Party": { color: "#f5c02c" } // declared color
   },
-  // additional colors for leading-but-undeclared
+  // tints for leading-but-undeclared
   leadTint: {
     ULP: "#f77e81",
     NDP: "#fedda6"
@@ -50,7 +50,7 @@ function seedCandidates(){
     if(!state.districts[name]){
       state.districts[name] = {
         name,
-        declared: 0, // 0 leading-only, 1 declared
+        declared: 0, // 0 = leading only, 1 = declared
         candidates: [
           { party: "NDP", name: pair.NDP, votes: 0, swing: "0.0%" },
           { party: "ULP", name: pair.ULP, votes: 0, swing: "0.0%" },
@@ -131,10 +131,9 @@ function onDistrictHover(e, el){
   el.classList.add('district-hover');
   renderTooltipFor(id);
   tooltip.style.display = 'block';
-  onDistrictMove(e, el);
+  onDistrictMove(e);
 }
-function onDistrictOut(e, el){
-  el.classList.remove('district-hover');
+function onDistrictOut(){
   tooltip.style.display = 'none';
 }
 function onDistrictMove(e){
@@ -149,7 +148,7 @@ function onDistrictMove(e){
 }
 
 // --------------------
-// Tooltip renderer (with Swing column)
+// Tooltip (with Swing column)
 // --------------------
 function renderTooltipFor(districtId){
   const nameKey = canonicalName(districtId);
@@ -233,6 +232,11 @@ function applyResults(){
     const id = canonicalName(raw);
     const info = state.districts[id];
 
+    // Map color RULES (match seat row):
+    // - Default: original fill (or grey)
+    // - If no votes or tie: default grey
+    // - If leading and declared=0: lead tint
+    // - If declared=1: declared color
     let fillColor = el.dataset.origfill || '#d7d7d7';
 
     if (info && info.candidates && info.candidates.length) {
@@ -240,15 +244,16 @@ function applyResults(){
       const ulp = info.candidates.find(c => c.party === 'ULP') || { votes: 0 };
       const vN = Number(ndp.votes || 0);
       const vU = Number(ulp.votes || 0);
+      const declared = Number(info.declared || 0) === 1;
 
       if (vN === 0 && vU === 0) {
         fillColor = el.dataset.origfill || '#d7d7d7';
       } else if (vN === vU) {
-        fillColor = '#000000'; // non-zero tie
+        fillColor = el.dataset.origfill || '#d7d7d7';
       } else if (vN > vU) {
-        fillColor = (state.parties['NDP'] && state.parties['NDP'].color) || '#999';
+        fillColor = declared ? (state.parties['NDP']?.color || '#999') : (state.leadTint.NDP);
       } else {
-        fillColor = (state.parties['ULP'] && state.parties['ULP'].color) || '#999';
+        fillColor = declared ? (state.parties['ULP']?.color || '#999') : (state.leadTint.ULP);
       }
 
       info.totalVotes = vN + vU;
@@ -260,11 +265,11 @@ function applyResults(){
 
   renderPopularVote();
   renderSeatRow();
-  renderLegend();
+  renderLegendBasics();
   renderLastUpdated();
 }
 
-// Popular vote: 2-segment stacked bar with vertical 50% marker
+// Popular vote: 2-segment stacked bar with 50% marker ABOVE bar
 function renderPopularVote(){
   const partyTotals = {};
   let totalVotes = 0;
@@ -277,7 +282,7 @@ function renderPopularVote(){
 
   const ndpVotes = partyTotals["NDP"] || 0;
   const ulpVotes = partyTotals["ULP"] || 0;
-  const total = totalVotes || (ndpVotes + ulpVotes);
+  const total = ndpVotes + ulpVotes;
   const ndpPct = total ? (ndpVotes/total*100) : 0;
   const ulpPct = total ? (ulpVotes/total*100) : 0;
 
@@ -296,71 +301,81 @@ function renderPopularVote(){
   pvBar.appendChild(ndpSeg);
   pvBar.appendChild(ulpSeg);
 
-  qs('#pv-total').textContent = (totalVotes || 0) + ' votes';
+  qs('#pv-total').textContent = (total || 0) + ' votes';
 }
 
-// Seat row: 15 squares, coloring rules per declared/leading
+// Seat row: only seats with results. NDP fills from left, ULP from right.
 function renderSeatRow(){
   const cont = qs('#seats-row');
   if (!cont) return;
   cont.innerHTML = '';
 
-  // Build seat data from districts (alphabetical)
-  const districts = Object.entries(state.districts)
-    .sort((a,b)=> (a[1].name||a[0]).localeCompare(b[1].name||b[0]));
+  // Collect seat entries for districts with a non-tied, non-zero lead
+  const ndpSeats = [];
+  const ulpSeats = [];
 
-  const seats = [];
-  districts.forEach(([id,d])=>{
+  Object.entries(state.districts).forEach(([id,d])=>{
     const ndp = (d.candidates||[]).find(c=>c.party==='NDP') || {votes:0};
     const ulp = (d.candidates||[]).find(c=>c.party==='ULP') || {votes:0};
     const vN = Number(ndp.votes||0), vU = Number(ulp.votes||0);
-    const diff = Math.abs(vN - vU);
+    if (vN === 0 && vU === 0) return;      // no result yet
+    if (vN === vU) return;                  // tie -> not counted in seat row
 
-    let party = null;
-    let color = '#d7d7d7'; // default grey
-    if (vN === 0 && vU === 0) {
-      // keep default
-    } else if (vN === vU) {
-      // tie non-zero → black (but instruction only for map; for seats unspecified)
-      // We'll keep default grey in seat row when tied to avoid implying a winner.
-      color = '#d7d7d7';
-    } else if (vN > vU) {
-      party = 'NDP';
-      color = d.declared ? (state.parties['NDP']?.color || '#999') : (state.leadTint.NDP);
+    const declared = Number(d.declared||0) === 1;
+    const lead = Math.abs(vN - vU);
+    if (vN > vU) {
+      ndpSeats.push({
+        district: d.name || id,
+        party: 'NDP',
+        declared,
+        lead,
+        color: declared ? (state.parties['NDP']?.color || '#999') : (state.leadTint.NDP)
+      });
     } else {
-      party = 'ULP';
-      color = d.declared ? (state.parties['ULP']?.color || '#999') : (state.leadTint.ULP);
+      ulpSeats.push({
+        district: d.name || id,
+        party: 'ULP',
+        declared,
+        lead,
+        color: declared ? (state.parties['ULP']?.color || '#999') : (state.leadTint.ULP)
+      });
     }
-
-    seats.push({
-      district: d.name || id,
-      party,
-      declared: !!d.declared,
-      lead: diff,
-      color
-    });
   });
 
-  // Ensure exactly 15 squares
-  while (seats.length < (state.totalSeats||15)) {
-    seats.push({ district: null, party:null, declared:false, lead:0, color:'#d7d7d7' });
-  }
-  seats.length = state.totalSeats || 15;
+  // You can choose ordering within each side; we'll put declared first (stronger), then by lead desc
+  ndpSeats.sort((a,b)=> (b.declared - a.declared) || (b.lead - a.lead));
+  ulpSeats.sort((a,b)=> (b.declared - a.declared) || (b.lead - a.lead));
 
-  // Render squares
-  seats.forEach(seat=>{
+  const TOTAL = state.totalSeats || 15;
+  const slots = new Array(TOTAL).fill(null);
+
+  // Fill from left with NDP
+  for (let i=0; i<ndpSeats.length && i<TOTAL; i++){
+    slots[i] = ndpSeats[i];
+  }
+  // Fill from right with ULP
+  for (let j=0; j<ulpSeats.length && j<TOTAL; j++){
+    const idx = TOTAL - 1 - j;
+    // If collision (rare when ndp+ulp > TOTAL), keep whichever has greater lead
+    if (slots[idx]) {
+      if (ulpSeats[j].lead > slots[idx].lead) slots[idx] = ulpSeats[j];
+      // else leave NDP seat in place
+    } else {
+      slots[idx] = ulpSeats[j];
+    }
+  }
+
+  // Render 15 squares (blanks stay grey)
+  slots.forEach(seat=>{
     const div = document.createElement('div');
     div.className = 'seat-square';
-    div.style.background = seat.color;
-    if (seat.district) {
+    const bg = seat ? seat.color : '#d7d7d7';
+    div.style.background = bg;
+
+    if (seat) {
       div.style.cursor = 'pointer';
       div.addEventListener('mouseenter', e=>{
-        const status = seat.party
-          ? (seat.declared ? 'victory' : 'leading')
-          : (seat.lead>0 ? 'leading' : 'No results');
-        const line2 = seat.party
-          ? `${seat.party} ${seat.declared ? 'victory' : 'leading'} +${seat.lead}`
-          : (seat.lead>0 ? `Tie +${seat.lead}` : 'No results');
+        const line2 = `${seat.party} ${seat.declared ? 'victory' : 'leading'} +${seat.lead}`;
         tooltip.innerHTML = `
           <div class="district-name">${seat.district}</div>
           <div>${line2}</div>
@@ -375,12 +390,12 @@ function renderSeatRow(){
   });
 
   // Summary: count declared seats
-  const declaredCount = seats.filter(s=>s.declared && s.party).length;
+  const declaredCount = slots.filter(s=>s && s.declared).length;
   qs('#seat-summary').textContent = `${declaredCount} / ${state.totalSeats||15} decided`;
 }
 
-// Legend: full names
-function renderLegend(){
+// Minimal party list (declared colors) — above we also show the matrix
+function renderLegendBasics(){
   const legend = qs('#legend'); legend.innerHTML = '';
   const items = [
     { label: "Unity Labour Party", color: state.parties["ULP"].color },
