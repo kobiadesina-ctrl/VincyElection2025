@@ -28,8 +28,8 @@
         <div class="pv-wrap">
           <!-- 50% marker above the bar ONLY -->
           <div class="pv-50vline" aria-hidden="true"></div>
-          <div class="pv-50label-top">50%</div>
           <div class="pv-50caret" aria-hidden="true">▼</div>
+          <div class="pv-50label-top">50%</div>
 
           <div class="pv-bar" id="pv-bar">
             <!-- segments injected by JS -->
@@ -57,22 +57,26 @@
       <aside class="right">
         <div class="card">
           <label>Legend</label>
-          <div id="legend" style="margin-top:8px"></div>
 
+          <!-- New compact legend matrix -->
           <div class="legend-matrix">
             <div class="lm-head lm-declared">Declared</div>
             <div class="lm-head lm-leading">Leading</div>
 
             <div class="lm-row">
+              <div class="lm-swatches">
+                <span class="lm-swatch ulp-declared"></span>
+                <span class="lm-swatch ulp-leading"></span>
+              </div>
               <div class="lm-name">Unity Labour Party</div>
-              <div class="lm-swatch ulp-declared"></div>
-              <div class="lm-swatch ulp-leading"></div>
             </div>
 
             <div class="lm-row">
+              <div class="lm-swatches">
+                <span class="lm-swatch ndp-declared"></span>
+                <span class="lm-swatch ndp-leading"></span>
+              </div>
               <div class="lm-name">New Democratic Party</div>
-              <div class="lm-swatch ndp-declared"></div>
-              <div class="lm-swatch ndp-leading"></div>
             </div>
           </div>
 
