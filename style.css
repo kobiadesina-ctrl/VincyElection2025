@@ -1,15 +1,25 @@
 :root{--bg:#fafafa;--panel:#fff;--muted:#777}
 body{font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);margin:0;color:#111}
 .wrap{max-width:1100px;margin:28px auto;padding:20px}
-header{display:flex;gap:16px;align-items:center;justify-content:space-between}
+header{display:flex;gap:16px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
 h1{font-size:20px;margin:0}
 .card{background:var(--panel);border-radius:12px;box-shadow:0 6px 20px rgba(15,15,20,0.06);padding:12px}
 .layout{display:grid;grid-template-columns:1fr 420px;gap:16px;margin-top:18px}
 #map-area{background:linear-gradient(180deg,#fff,#fbfdff);min-height:560px;border-radius:10px;padding:8px;display:flex;align-items:center;justify-content:center}
 #svg-wrapper{width:100%;height:100%;overflow:hidden}
 #svg-wrapper svg{width:100%;height:auto;display:block}
-.muted{margin-top:6px;font-size:13px;color:var(--muted)}
+.muted{font-size:13px;color:var(--muted)}
 .dot-sep{margin:0 6px;color:var(--muted)}
+
+/* Party banner */
+.party-banner{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;max-width:720px;margin:2px auto 10px auto;
+}
+.pb-left,.pb-right{display:flex;align-items:center;gap:8px}
+.pb-right{flex-direction:row-reverse}
+.pb-logo{width:28px;height:28px;object-fit:contain}
+.pb-acronym{font-weight:700;letter-spacing:0.5px}
 
 /* Popular vote header layout */
 .pv-card{padding:12px}
@@ -19,7 +29,7 @@ h1{font-size:20px;margin:0}
 /* POPULAR VOTE (stacked bar) */
 .pv-wrap{position:relative;width:100%;max-width:720px;margin:0 auto 10px auto;padding-top:38px}
 .pv-bar{position:relative;height:40px;border-radius:8px;overflow:hidden;display:flex;align-items:stretch;background:#f0f2f7}
-.pv-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:600}
+.pv-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:600;transition:width 240ms ease}
 .pv-seg.ndp{background:#f5c02c}
 .pv-seg.ulp{background:#ed2633}
 
@@ -28,11 +38,29 @@ h1{font-size:20px;margin:0}
 .pv-50caret{position:absolute;left:50%;transform:translateX(-50%);bottom:40px;margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1}
 .pv-50label-top{position:absolute;left:50%;transform:translateX(-50%);bottom:40px;margin-bottom:26px;font-size:12px;color:var(--muted)}
 
+/* Loading shimmer for pv bar and seats */
+.is-loading{
+  position:relative;overflow:hidden;background:linear-gradient(90deg,#eee 25%,#f6f6f6 37%,#eee 63%);background-size:400% 100%;
+  animation:shimmer 1.2s ease-in-out infinite;
+}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+
 /* SEAT ROW */
 .seats-wrap{width:100%;max-width:720px;margin:18px auto 4px auto}
 .seats-row{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:8px;height:28px}
-.seat-square{width:100%;height:100%;border-radius:4px;border:1px solid rgba(255,255,255,0.8);box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04)}
+.seat-square{width:100%;height:100%;border-radius:4px;border:1px solid rgba(255,255,255,0.8);box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04);transition:background-color 160ms ease}
 .seat-summary{margin-top:8px}
+
+/* Seat counts line */
+.seat-counts{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  width:100%;max-width:720px;margin:10px auto 0 auto;
+}
+.seat-count .sc-title{font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.sc-dot{width:8px;height:8px;border-radius:50%}
+.ndp-dot{background:#f5c02c}
+.ulp-dot{background:#ed2633}
+.seat-count .sc-line{color:#333}
 
 /* RIGHT COLUMN */
 .right{display:flex;flex-direction:column;gap:12px}
@@ -48,7 +76,7 @@ label{font-size:13px;color:var(--muted)}
 .lm-name{grid-column:1;font-size:13px;color:#222;padding:4px 0}
 .lm-swatch{width:18px;height:18px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);justify-self:center}
 .ulp-declared{background:#ed2633}
-.ulp-leading{background:#f77e81}
+.ulp-leading{background:#fedfad}  /* ULP leading tint per request */
 .ndp-declared{background:#f5c02c}
 .ndp-leading{background:#fedda6}
 
@@ -58,37 +86,62 @@ label{font-size:13px;color:var(--muted)}
 .swing-text{color:#444;font-size:13px}
 
 /* TOOLTIP */
-.tooltip{position:fixed;pointer-events:none;background:#fff;border-radius:8px;padding:10px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 6px 18px rgba(11,13,20,0.08);font-size:13px;width:380px;z-index:9999}
-.district-name{font-weight:600;margin-bottom:6px}
+.tooltip{
+  position:fixed;pointer-events:none;background:#fff;border-radius:10px;padding:12px;
+  border:1px solid rgba(0,0,0,0.08);box-shadow:0 6px 18px rgba(11,13,20,0.08);
+  font-size:14px;width:380px;z-index:9999;max-height:65vh;overflow:auto;-webkit-overflow-scrolling:touch;
+}
+.district-name{font-weight:600;margin-bottom:8px}
 
 /* 5-column tooltip table */
-.tt-header,.tt-row{display:grid;grid-template-columns:88px 1fr 82px 62px 66px;align-items:center;gap:8px}
-.tt-header{font-size:12px;color:var(--muted);padding-bottom:4px;border-bottom:1px solid rgba(0,0,0,0.06);margin-bottom:4px}
-.tt-row{padding:6px 6px;border-radius:6px}
-.tt-col{min-width:0}
+.tt-header,.tt-row{display:grid;grid-template-columns:88px 1fr 92px 66px 72px;align-items:center;gap:8px}
+.tt-header{font-size:12px;color:#444;padding-bottom:6px;border-bottom:1px solid rgba(0,0,0,0.06);margin-bottom:6px}
+.tt-row{padding:6px;border-radius:8px}
+.tt-col{min-width:0;color:#000} /* text black by default */
 .party-cell{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .party-chip{width:12px;height:12px;border-radius:3px;flex-shrink:0}
-.candidate-cell{display:flex;align-items:center;gap:6px}
-.candidate-name{font-weight:400;font-size:13px;line-height:1} /* default unbolded */
-.declared-icon{width:16px;height:16px;flex:0 0 auto;display:inline-block}
-.votes-cell,.share-cell,.swing-cell{text-align:right;font-size:13px}
-.votes-cell,.share-cell{color:var(--muted)}
-.swing-cell{font-weight:600}
+
+/* Candidate cell: prevent icon overlap on mobile */
+.candidate-cell{
+  display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow:hidden;min-width:0;
+}
+.candidate-name{font-weight:400;font-size:14px;line-height:1.1;flex:1 1 auto;min-width:0;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.declared-icon{width:16px;height:16px;flex:0 0 auto;margin-left:6px}
+
+/* Right-aligned numeric cells (black text) */
+.votes-cell,.share-cell,.swing-cell{text-align:right;font-size:14px}
+.votes-cell,.share-cell{color:#000}
+.swing-cell{font-weight:700}
+
+/* Swing colors stay green/red */
 .swing-pos{color:#1a7f37}
 .swing-neg{color:#d03a3a}
-.swing-zero{color:var(--muted)}
-.tt-total{margin-top:8px;color:var(--muted);font-size:12px}
+.swing-zero{color:#000}
 
-/* Declared row emphasis */
-.tt-row--declared .tt-col{font-weight:700} /* all values bold */
+/* Declared row emphasis: black text, background tint from DECLARED party (handled inline) */
 .tt-row--declared .candidate-name{font-weight:700}
+.tt-row--declared .tt-col{font-weight:700}
 
 /* Map hover outline */
 .district-hover{stroke:#000 !important;stroke-width:2.5px !important}
 
+/* Reconnect banner */
+.reconnect{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:18px;background:#fff;border:1px solid rgba(0,0,0,0.12);
+  box-shadow:0 6px 18px rgba(11,13,20,0.12);border-radius:8px;padding:10px 12px;
+  font-size:13px;color:#333;z-index:10000;
+}
+
 /* Responsive */
 @media (max-width:980px){
   .layout{grid-template-columns:1fr}
-  .pv-wrap,.seats-wrap{max-width:100%}
+  .pv-wrap,.seats-wrap,.party-banner,.seat-counts{max-width:100%}
   .tooltip{width:min(90vw,380px)}
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce){
+  .pv-seg,.seat-square{transition:none}
+  .is-loading{animation:none}
 }
