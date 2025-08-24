@@ -1,18 +1,21 @@
 /************************************************************
- * Election Map — declared-first tooltip row + bold values
- * - Declared row appears first, bolded, and filled with leading color
- * - Swing shown exactly as in results.json
- * - Two-party declaration model (declared: {NDP, ULP})
- * - Robust SVG binding + z-order hover fix
- * - Map coloring: declared colors / leading tints / tie black
- * - Popular vote stack, seat row packing (NDP left, ULP right)
- * - Mobile-safe tooltip clamping; #,### number formatting
+ * Design upgrades, minus 25/75 ticks:
+ * - Party banner, smooth transitions (+ reduced-motion support)
+ * - Tooltip: roomy, scrollable, mobile tap-to-pin; icon never overlaps text
+ * - Black text everywhere; swing remains green/red
+ * - Keyboard focus support; ESC to close tooltip
+ * - Reconnect banner on fetch failures
+ * - ARIA labels for seat squares; live last-updated
  ************************************************************/
 
 // ---------- DOM helpers ----------
 const qs = s => document.querySelector(s);
 const svgWrapper = qs('#svg-wrapper');
 const tooltip = qs('#tooltip');
+const pvBar = qs('#pv-bar');
+const seatsRow = qs('#seats-row');
+const lastUpdatedEl = qs('#last-updated');
+const reconnectEl = qs('#reconnect');
 const fmtInt = new Intl.NumberFormat('en-US');
 
 // ---------- Global state ----------
@@ -21,17 +24,17 @@ let state = {
     "Unity Labour Party": { color: "#ed2633" },     // ULP declared color
     "New Democratic Party": { color: "#f5c02c" }    // NDP declared color
   },
-  leadTint: { ULP: "#f77e81", NDP: "#fedda6" },    // leading but not declared
+  leadTint: { ULP: "#fedfad", NDP: "#fedda6" },     // leading tints
   districts: {},
   totalSeats: 15,
   lastUpdated: null
 };
 
-// Short aliases
+// Short aliases (for convenience)
 state.parties["ULP"] = state.parties["Unity Labour Party"];
 state.parties["NDP"] = state.parties["New Democratic Party"];
 
-// ---------- Candidates ----------
+// ---------- Candidates (static names used in tooltips) ----------
 const CANDIDATE_CONFIG = {
   "North Windward":         { NDP: "Shevern John",         ULP: "Grace Walters"      },
   "North Central Windward": { NDP: "Chieftain Neptune",    ULP: "Ralph Gonsalves"    },
@@ -55,7 +58,7 @@ function seedCandidates(){
     if(!state.districts[name]){
       state.districts[name] = {
         name,
-        declared: { NDP: 0, ULP: 0 }, // two-column model
+        declared: { NDP: 0, ULP: 0 }, // {NDP:0/1, ULP:0/1}
         candidates: [
           { party: "NDP", name: pair.NDP, votes: 0, swing: "0.0%" },
           { party: "ULP", name: pair.ULP, votes: 0, swing: "0.0%" },
@@ -67,7 +70,7 @@ function seedCandidates(){
 }
 seedCandidates();
 
-// ---------- Canonical naming ----------
+// ---------- Canonical naming for SVG keys ----------
 const ID_TO_NAME = {
   EG: "East St. George",
   WG: "West St. George",
@@ -85,81 +88,96 @@ const ID_TO_NAME = {
   CL: "Central Leeward",
   MQ: "Marriaqua",
 };
-const NAME_TO_LABEL = {
-  "North Windward": "NORTH WINDWARD",
-  "North Central Windward": "NORTH CENTRAL WINDWARD",
-  "South Central Windward": "SOUTH CENTRAL WINDWARD",
-  "South Windward": "SOUTH WINDWARD",
-  "Marriaqua": "MARRIAQUA",
-  "East St. George": "EAST ST. GEORGE",
-  "West St. George": "WEST ST. GEORGE",
-  "East Kingstown": "EAST KINGSTOWN",
-  "Central Kingstown": "CENTRAL KINGSTOWN",
-  "West Kingstown": "WEST KINGSTOWN",
-  "South Leeward": "SOUTH LEEWARD",
-  "Central Leeward": "CENTRAL LEEWARD",
-  "North Leeward": "NORTH LEEWARD",
-  "Northern Grenadines": "NORTHERN GRENADINES",
-  "Southern Grenadines": "SOUTHERN GRENADINES",
-};
 const canonicalName = raw => ID_TO_NAME[raw] || raw;
 
-// ---------- SVG district mapping ----------
+// ---------- Map element targeting ----------
 let districtTargets = new Map();
 const originalOrder = new WeakMap(); // element -> { parent, nextSibling }
 
-function isMarker(el) { return el && el.hasAttribute('id') && el.hasAttribute('data-district'); }
-function isPaintable(el) {
-  if (!el) return false;
-  const t = el.tagName;
-  return t === 'path' || t === 'polygon' || t === 'rect' || t === 'ellipse' || t === 'circle';
+function isMarker(el){ return el && el.hasAttribute('id') && el.hasAttribute('data-district'); }
+function isPaintable(el){
+  if(!el) return false;
+  return ['path','polygon','rect','ellipse','circle'].includes(el.tagName);
 }
 
-function attachHover(key, targets) {
+// Hover/focus handling including z-order bring-to-front
+function attachHoverAndFocus(key, targets){
   const enter = e => {
     const name = canonicalName(key);
     renderTooltipFor(name);
-    showTooltipAt(e.clientX, e.clientY);
+    showTooltipAt(e.clientX || (e.touches && e.touches[0]?.clientX) || 0,
+                  e.clientY || (e.touches && e.touches[0]?.clientY) || 0);
 
     // bring to front
-    targets.forEach(t => {
-      if (!originalOrder.has(t)) originalOrder.set(t, { parent: t.parentNode, next: t.nextSibling });
+    targets.forEach(t=>{
+      if(!originalOrder.has(t)) originalOrder.set(t, { parent: t.parentNode, next: t.nextSibling });
       t.parentNode.appendChild(t);
       t.classList.add('district-hover');
     });
   };
   const leave = () => {
-    tooltip.style.display = 'none';
-    targets.forEach(t => {
+    if (!tooltipPinned) tooltip.style.display = 'none';
+    targets.forEach(t=>{
       const rec = originalOrder.get(t);
-      if (rec && rec.parent) rec.parent.insertBefore(t, rec.next);
+      if(rec && rec.parent) rec.parent.insertBefore(t, rec.next);
       t.classList.remove('district-hover');
     });
   };
-  const move = e => showTooltipAt(e.clientX, e.clientY);
+  const move = e => {
+    if (!tooltipPinned) {
+      showTooltipAt(e.clientX, e.clientY);
+    }
+  };
 
-  targets.forEach(el => {
+  // Mouse
+  targets.forEach(el=>{
     el.style.cursor = 'pointer';
+    el.setAttribute('tabindex','0'); // keyboard focusable
     el.addEventListener('mouseenter', enter);
     el.addEventListener('mousemove', move);
     el.addEventListener('mouseleave', leave);
+    // Focus/blur
+    el.addEventListener('focus', (e)=>{
+      renderTooltipFor(canonicalName(key));
+      const bb = el.getBoundingClientRect();
+      showTooltipAt(bb.right + 8, bb.top + 8);
+      targets.forEach(t=>{
+        if(!originalOrder.has(t)) originalOrder.set(t, { parent: t.parentNode, next: t.nextSibling });
+        t.parentNode.appendChild(t);
+        t.classList.add('district-hover');
+      });
+    });
+    el.addEventListener('blur', leave);
+
+    // Click/tap to pin
+    el.addEventListener('click', (e)=>{
+      tooltipPinned = !tooltipPinned;
+      if (!tooltipPinned) tooltip.style.display = 'none';
+      e.stopPropagation();
+    });
+    // Touchstart to pin (mobile)
+    el.addEventListener('touchstart', (e)=>{
+      tooltipPinned = true;
+      enter(e);
+      e.stopPropagation();
+    }, {passive:true});
   });
 }
 
-function buildTargetsByOrder(svg) {
+function buildTargetsByOrder(svg){
   const map = new Map();
   const ordered = Array.from(svg.querySelectorAll('[id][data-district], path, polygon, rect, ellipse, circle'));
   let currentKey = null;
-  for (let i = 0; i < ordered.length; i++) {
+  for(let i=0;i<ordered.length;i++){
     const el = ordered[i];
-    if (isMarker(el)) {
+    if (isMarker(el)){
       currentKey = el.getAttribute('id') || el.getAttribute('data-district');
-      if (!map.has(currentKey)) map.set(currentKey, []);
+      if(!map.has(currentKey)) map.set(currentKey, []);
       continue;
     }
-    if (currentKey && isPaintable(el)) {
-      if (!el.dataset.origfill) {
-        const orig = el.style.fill || el.getAttribute('fill') || window.getComputedStyle(el).fill;
+    if(currentKey && isPaintable(el)){
+      if(!el.dataset.origfill){
+        const orig = el.style.fill || el.getAttribute('fill') || getComputedStyle(el).fill;
         el.dataset.origfill = (orig && orig !== 'none') ? orig : '#d7d7d7';
       }
       el.dataset.districtRef = currentKey;
@@ -169,86 +187,18 @@ function buildTargetsByOrder(svg) {
   return map;
 }
 
-function fallbackByInkscapeLabel(svg, key) {
-  const name = canonicalName(key);
-  const label = NAME_TO_LABEL[name];
-  if (!label) return [];
-  const sel = `[inkscape\\:label="${label}"]`;
-  const containers = Array.from(svg.querySelectorAll(sel));
-  const paints = [];
-  containers.forEach(c => {
-    if (isPaintable(c)) paints.push(c);
-    paints.push(...c.querySelectorAll('path,polygon,rect,ellipse,circle'));
-  });
-  paints.forEach(el => {
-    if (!el.dataset.origfill) {
-      const orig = el.style.fill || el.getAttribute('fill') || window.getComputedStyle(el).fill;
-      el.dataset.origfill = (orig && orig !== 'none') ? orig : '#d7d7d7';
-    }
-  });
-  return paints;
-}
-
-function fallbackByHeuristic(svg, key) {
-  const name = canonicalName(key);
-  const words = (NAME_TO_LABEL[name] || name).toLowerCase().split(/\s+/).filter(Boolean);
-  const paints = Array.from(svg.querySelectorAll('path,polygon,rect,ellipse,circle')).filter(el => {
-    const id = (el.id || '').toLowerCase();
-    const cls = (el.getAttribute('class') || '').toLowerCase();
-    return words.some(w => id.includes(w) || cls.includes(w));
-  });
-  paints.forEach(el => {
-    if (!el.dataset.origfill) {
-      const orig = el.style.fill || el.getAttribute('fill') || window.getComputedStyle(el).fill;
-      el.dataset.origfill = (orig && orig !== 'none') ? orig : '#d7d7d7';
-    }
-  });
-  return paints;
-}
-
-function buildDistrictTargets(svg) {
+function buildDistrictTargets(svg){
   districtTargets = buildTargetsByOrder(svg);
-  const expectedKeys = Object.keys(ID_TO_NAME);
-  expectedKeys.forEach(key => {
-    if (!districtTargets.has(key) || districtTargets.get(key).length === 0) {
-      const fbA = fallbackByInkscapeLabel(svg, key);
-      if (fbA.length) districtTargets.set(key, fbA);
-      else {
-        const fbB = fallbackByHeuristic(svg, key);
-        if (fbB.length) districtTargets.set(key, fbB);
-      }
-    }
-  });
-  districtTargets.forEach((targets, key) => {
-    if (!targets || targets.length === 0) {
-      console.warn(`[map] No shapes found for district key "${key}".`);
-      return;
-    }
-    attachHover(key, targets);
+  // Attach handlers
+  districtTargets.forEach((targets, key)=>{
+    if(!targets || targets.length===0) return;
+    attachHoverAndFocus(key, targets);
   });
 }
 
-// ---------- SVG loader ----------
-function loadSVG(svgText){
-  svgWrapper.innerHTML = svgText;
-  const svg = svgWrapper.querySelector('svg');
-  if(!svg) return;
+// ---------- Tooltip position / pinning ----------
+let tooltipPinned = false;
 
-  if(!svg.getAttribute('viewBox')){
-    const w = svg.getAttribute('width');
-    const h = svg.getAttribute('height');
-    if(w && h) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-  }
-  svg.removeAttribute('width');
-  svg.removeAttribute('height');
-  svg.style.width = '100%';
-  svg.style.height = 'auto';
-
-  buildDistrictTargets(svg);
-  applyResults();
-}
-
-// ---------- Tooltip placement (mobile-safe clamping) ----------
 function showTooltipAt(clientX, clientY){
   tooltip.style.display = 'block';
   const pad = 8;
@@ -270,7 +220,35 @@ function showTooltipAt(clientX, clientY){
   tooltip.style.top = top + 'px';
 }
 
-// ---------- Tooltip renderer (declared row first, bold, filled with leading color) ----------
+document.addEventListener('click', ()=>{
+  if (tooltipPinned) {
+    tooltipPinned = false;
+    tooltip.style.display = 'none';
+  }
+});
+
+// ---------- Tooltip renderer ----------
+function hexToRGBA(hex, a=0.22){
+  let h = hex.replace('#','');
+  if(h.length===3) h = h.split('').map(c=>c+c).join('');
+  const r = parseInt(h.slice(0,2),16);
+  const g = parseInt(h.slice(2,4),16);
+  const b = parseInt(h.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Swing display: keep “+” for non-negative, “-” for negative; strip any “-+”
+function formatSwingDisplay(raw){
+  if (raw == null || raw === "") return "0.0%";
+  const s = String(raw).trim().replace(/^\-\+/, "-").replace(/^\+?\+/, "+");
+  const m = s.match(/^([+\-]?)(\d+(\.\d+)?)/);
+  if (!m) return s;
+  const num = parseFloat((m[1] === "-" ? "-" : "") + m[2]);
+  const val = isNaN(num) ? 0 : num;
+  const sign = val < 0 ? "-" : "+";
+  return `${sign}${Math.abs(val).toFixed(1)}%`;
+}
+
 function renderTooltipFor(districtName){
   const info = state.districts[districtName] || {
     name: districtName, declared: {NDP:0,ULP:0}, candidates: [], totalVotes: 0
@@ -279,61 +257,51 @@ function renderTooltipFor(districtName){
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
 
-  // Votes to determine current leader color
-  const ndp = candidates.find(c=>c.party==='NDP') || { votes:0 };
-  const ulp = candidates.find(c=>c.party==='ULP') || { votes:0 };
+  const ndp = candidates.find(c=>c.party==='NDP') || { votes:0, swing:"0.0%" };
+  const ulp = candidates.find(c=>c.party==='ULP') || { votes:0, swing:"0.0%" };
   const vN = Number(ndp.votes||0), vU = Number(ulp.votes||0);
-  const hasVotes = (vN + vU) > 0;
-  const isTie = hasVotes && vN === vU;
 
-  let leadingColor = '#e9e9e9';
-  if (!isTie) {
-    if (vN > vU) leadingColor = state.leadTint.NDP;
-    else if (vU > vN) leadingColor = state.leadTint.ULP;
-  }
-
-  // Which party (if any) is declared
   const declaredN = Number(info.declared?.NDP||0) === 1;
   const declaredU = Number(info.declared?.ULP||0) === 1;
   let declaredParty = null;
   if (declaredN && !declaredU) declaredParty = 'NDP';
   else if (declaredU && !declaredN) declaredParty = 'ULP';
   else if (declaredN && declaredU) {
-    // both declared -> still bring the higher-vote first if any
+    // both declared: prefer higher vote if any
     if (vN > vU) declaredParty = 'NDP';
     else if (vU > vN) declaredParty = 'ULP';
   }
 
-  // Order rows: declared party first if exists
-  const order = declaredParty ? [declaredParty, declaredParty === 'NDP' ? 'ULP' : 'NDP'] : ['NDP','ULP'];
+  // Declared row background = DECLARED party color (subtle alpha)
+  const declaredBg = declaredParty ? hexToRGBA(state.parties[declaredParty].color, 0.22) : 'transparent';
 
+  const order = declaredParty ? [declaredParty, declaredParty === 'NDP' ? 'ULP' : 'NDP'] : ['NDP','ULP'];
   const partyColor = p => (state.parties[p] && state.parties[p].color) || '#999';
-  const swingClass = s => (typeof s === 'string' && s.trim().startsWith('+'))
-    ? 'swing-pos' : (typeof s === 'string' && s.trim().startsWith('-')) ? 'swing-neg' : 'swing-zero';
-  const fmtPct = (v, t) => t ? ((v || 0) / t * 100).toFixed(1) : '0.0';
+  const swingClass = s => (String(s).trim().startsWith('-') ? 'swing-neg' :
+                           String(s).trim().startsWith('+') ? 'swing-pos' : 'swing-zero');
+  const pct = (v,t)=> t ? ((v||0)/t*100).toFixed(1) : '0.0';
 
   const rows = order.map(p=>{
-    const c = (p === 'NDP') ? ndp : ulp;
-    const pct = fmtPct(c.votes, total);
-    const sw = (c.swing == null || c.swing === "") ? "0.0%" : String(c.swing);
-    const isDeclaredForParty = (info.declared?.[p] === 1 || info.declared?.[p] === '1');
-    const declaredIcon = isDeclaredForParty ? `<img src="Declaration.svg" alt="Declared" class="declared-icon" />` : '';
-
-    const declaredRowClass = (declaredParty === p) ? ' tt-row--declared' : '';
-    const declaredRowStyle = (declaredParty === p) ? ` style="background:${leadingColor}"` : '';
+    const c = (p==='NDP') ? ndp : ulp;
+    const share = pct(c.votes, total);
+    const sw = formatSwingDisplay(c.swing);
+    const isDeclRow = (declaredParty === p);
+    const rowCls = isDeclRow ? ' tt-row--declared' : '';
+    const rowStyle = isDeclRow ? ` style="background:${declaredBg}"` : '';
+    const hasDeclIcon = (info.declared?.[p] === 1 || info.declared?.[p] === '1');
 
     return `
-      <div class="tt-row${declaredRowClass}"${declaredRowStyle}>
+      <div class="tt-row${rowCls}"${rowStyle}>
         <div class="tt-col party-cell">
           <span class="party-chip" style="background:${partyColor(p)}"></span>
           <span class="party-name">${p}</span>
         </div>
         <div class="tt-col candidate-cell">
           <span class="candidate-name">${c.name || '—'}</span>
-          ${declaredIcon}
+          ${hasDeclIcon ? `<img src="Declaration.svg" alt="Declared" class="declared-icon" />` : ''}
         </div>
         <div class="tt-col votes-cell">${fmtInt.format(c.votes || 0)}</div>
-        <div class="tt-col share-cell">${pct}%</div>
+        <div class="tt-col share-cell">${share}%</div>
         <div class="tt-col swing-cell ${swingClass(sw)}">${sw}</div>
       </div>
     `;
@@ -358,37 +326,34 @@ function applyResults(){
   const svg = svgWrapper.querySelector('svg');
   if(!svg) return;
 
-  districtTargets.forEach((targets, key) => {
+  // Paint each district
+  districtTargets.forEach((targets, key)=>{
     if (!targets || !targets.length) return;
-
     const name = canonicalName(key);
     const info = state.districts[name];
-
     let fillColor = targets[0].dataset.origfill || '#d7d7d7';
-    if (info && info.candidates && info.candidates.length) {
-      const ndp = info.candidates.find(c => c.party === 'NDP') || { votes: 0 };
-      const ulp = info.candidates.find(c => c.party === 'ULP') || { votes: 0 };
-      const vN = Number(ndp.votes || 0);
-      const vU = Number(ulp.votes || 0);
-      const declaredN = Number(info.declared?.NDP || 0) === 1;
-      const declaredU = Number(info.declared?.ULP || 0) === 1;
+
+    if (info && info.candidates && info.candidates.length){
+      const ndp = info.candidates.find(c=>c.party==='NDP') || { votes:0 };
+      const ulp = info.candidates.find(c=>c.party==='ULP') || { votes:0 };
+      const vN = Number(ndp.votes||0), vU = Number(ulp.votes||0);
+      const declaredN = Number(info.declared?.NDP||0) === 1;
+      const declaredU = Number(info.declared?.ULP||0) === 1;
 
       const hasVotes = (vN + vU) > 0;
       const isTie = vN === vU && hasVotes;
 
       if (isTie) {
-        fillColor = '#000000'; // tie with non-zero -> black
+        fillColor = '#000'; // tie & non-zero
       } else if (declaredN && !declaredU) {
         fillColor = state.parties['NDP']?.color || '#999';
       } else if (declaredU && !declaredN) {
         fillColor = state.parties['ULP']?.color || '#999';
       } else if (declaredN && declaredU) {
-        // contradictory; choose higher votes if any, else black
         if (vN > vU) fillColor = state.parties['NDP']?.color || '#999';
         else if (vU > vN) fillColor = state.parties['ULP']?.color || '#999';
-        else fillColor = '#000000';
+        else fillColor = '#000';
       } else {
-        // no declaration: use leading tint if any
         if (!hasVotes) fillColor = targets[0].dataset.origfill || '#d7d7d7';
         else if (vN > vU) fillColor = state.leadTint.NDP;
         else if (vU > vN) fillColor = state.leadTint.ULP;
@@ -397,7 +362,7 @@ function applyResults(){
       info.totalVotes = vN + vU;
     }
 
-    targets.forEach(el => { el.style.fill = fillColor; });
+    targets.forEach(el=>{ el.style.fill = fillColor; });
   });
 
   renderPopularVote();
@@ -407,22 +372,23 @@ function applyResults(){
 
 // ---------- Popular vote ----------
 function renderPopularVote(){
-  const partyTotals = {};
-  let totalVotes = 0;
+  const totals = { NDP:0, ULP:0 };
   Object.values(state.districts).forEach(d=>{
     (d.candidates||[]).forEach(c=>{
-      partyTotals[c.party] = (partyTotals[c.party] || 0) + (c.votes||0);
-      totalVotes += (c.votes||0);
+      if (c.party==='NDP' || c.party==='ULP'){
+        totals[c.party] += (c.votes||0);
+      }
     });
   });
 
-  const ndpVotes = partyTotals["NDP"] || 0;
-  const ulpVotes = partyTotals["ULP"] || 0;
+  const ndpVotes = totals.NDP;
+  const ulpVotes = totals.ULP;
   const total = ndpVotes + ulpVotes;
-  const ndpPct = total ? (ndpVotes/total*100) : 0;
-  const ulpPct = total ? (ulpVotes/total*100) : 0;
+  const ndpPct = total ? ndpVotes/total*100 : 0;
+  const ulpPct = total ? ulpVotes/total*100 : 0;
 
-  const pvBar = qs('#pv-bar'); pvBar.innerHTML = '';
+  pvBar.classList.remove('is-loading');
+  pvBar.innerHTML = '';
 
   const ndpSeg = document.createElement('div');
   ndpSeg.className = 'pv-seg ndp';
@@ -437,17 +403,18 @@ function renderPopularVote(){
   pvBar.appendChild(ndpSeg);
   pvBar.appendChild(ulpSeg);
 
-  qs('#pv-total').textContent = `${fmtInt.format(total || 0)} votes`;
+  qs('#pv-total').textContent = `${fmtInt.format(total)} votes`;
 }
 
-// ---------- Seat row ----------
+// ---------- Seat row & counts ----------
 function renderSeatRow(){
-  const cont = qs('#seats-row');
-  if (!cont) return;
-  cont.innerHTML = '';
+  seatsRow.classList.remove('is-loading');
+  seatsRow.innerHTML = '';
 
   const ndpSeats = [];
   const ulpSeats = [];
+
+  let ndpDeclared=0, ulpDeclared=0, ndpLeading=0, ulpLeading=0;
 
   Object.entries(state.districts).forEach(([id,d])=>{
     const ndp = (d.candidates||[]).find(c=>c.party==='NDP') || {votes:0};
@@ -458,111 +425,131 @@ function renderSeatRow(){
 
     const hasVotes = (vN+vU)>0;
     const isTie = vN === vU && hasVotes;
+
+    if (declaredN) ndpDeclared++;
+    if (declaredU) ulpDeclared++;
+    if (!declaredN && !declaredU && hasVotes && !isTie){
+      if (vN>vU) ndpLeading++; else if (vU>vN) ulpLeading++;
+    }
+
     if (!hasVotes) return;                          // no result -> blank
     if (isTie && !declaredN && !declaredU) return; // tie w/o declaration -> blank
 
     const lead = Math.abs(vN - vU);
 
     // seat belongs to declared party if declared, else leader
-    let party = null, declaredFlag=false, color;
-    if (declaredN && !declaredU) { party='NDP'; declaredFlag=true; color=state.parties['NDP']?.color||'#999'; }
-    else if (declaredU && !declaredN) { party='ULP'; declaredFlag=true; color=state.parties['ULP']?.color||'#999'; }
-    else if (declaredN && declaredU) {
-      if (vN > vU) { party='NDP'; declaredFlag=true; color=state.parties['NDP']?.color||'#999'; }
-      else if (vU > vN) { party='ULP'; declaredFlag=true; color=state.parties['ULP']?.color||'#999'; }
-      else return; // both declared & tie -> skip
+    let party=null, declaredFlag=false, color;
+    if (declaredN && !declaredU){ party='NDP'; declaredFlag=true; color=state.parties['NDP'].color; }
+    else if (declaredU && !declaredN){ party='ULP'; declaredFlag=true; color=state.parties['ULP'].color; }
+    else if (declaredN && declaredU){
+      if (vN>vU){ party='NDP'; declaredFlag=true; color=state.parties['NDP'].color; }
+      else if (vU>vN){ party='ULP'; declaredFlag=true; color=state.parties['ULP'].color; }
+      else return;
     } else {
-      if (vN > vU) { party='NDP'; color=state.leadTint.NDP; }
-      else if (vU > vN) { party='ULP'; color=state.leadTint.ULP; }
-      else return; // tie but not declared -> skip
+      if (vN>vU){ party='NDP'; color=state.leadTint.NDP; }
+      else if (vU>vN){ party='ULP'; color=state.leadTint.ULP; }
+      else return;
     }
 
-    // tooltip lines
-    let tipLines = [];
-    const declText = declaredN ? 'NDP' : (declaredU ? 'ULP' : null);
-    if (declText && ((party==='NDP' && vN>=vU) || (party==='ULP' && vU>=vN))) {
-      tipLines.push(`${declText} victory +${fmtInt.format(lead)}`);
-    } else if (declText) {
-      tipLines.push(`${declText} victory`);
-      if (!isTie) {
-        const leadingText = (vN > vU) ? 'NDP' : 'ULP';
-        tipLines.push(`${leadingText} leading +${fmtInt.format(lead)}`);
-      } else {
-        tipLines.push(`Tie`);
-      }
-    } else {
-      if (isTie) tipLines.push('Tie');
-      else tipLines.push(`${party} leading +${fmtInt.format(lead)}`);
-    }
-
-    const seatObj = { district: d.name || id, party, declared: declaredFlag, lead, color, tipLines };
-    if (party === 'NDP') ndpSeats.push(seatObj);
-    else ulpSeats.push(seatObj);
+    const seatObj = { district: d.name || id, party, declared: declaredFlag, lead, color,
+      tipLines: buildSeatTipLines(declaredN, declaredU, vN, vU) };
+    if (party==='NDP') ndpSeats.push(seatObj); else ulpSeats.push(seatObj);
   });
 
-  // within each side: declared first, then largest lead
+  // sort: declared first, then biggest lead
   ndpSeats.sort((a,b)=> (b.declared - a.declared) || (b.lead - a.lead));
   ulpSeats.sort((a,b)=> (b.declared - a.declared) || (b.lead - a.lead));
 
   const TOTAL = state.totalSeats || 15;
   const slots = new Array(TOTAL).fill(null);
-
-  // Fill from left with NDP
-  for (let i=0; i<ndpSeats.length && i<TOTAL; i++) slots[i] = ndpSeats[i];
-  // Fill from right with ULP
-  for (let j=0; j<ulpSeats.length && j<TOTAL; j++){
-    const idx = TOTAL - 1 - j;
-    if (!slots[idx]) slots[idx] = ulpSeats[j];
-    else if (ulpSeats[j].lead > slots[idx].lead) slots[idx] = ulpSeats[j];
+  // NDP from left
+  for(let i=0;i<ndpSeats.length && i<TOTAL;i++) slots[i]=ndpSeats[i];
+  // ULP from right
+  for(let j=0;j<ulpSeats.length && j<TOTAL;j++){
+    const idx = TOTAL-1-j;
+    if(!slots[idx]) slots[idx]=ulpSeats[j];
+    else if (ulpSeats[j].lead > slots[idx].lead) slots[idx]=ulpSeats[j];
   }
 
   slots.forEach(seat=>{
     const div = document.createElement('div');
     div.className = 'seat-square';
     div.style.background = seat ? seat.color : '#d7d7d7';
-
-    if (seat) {
-      div.style.cursor = 'pointer';
+    if (seat){
+      div.setAttribute('role','button');
+      div.setAttribute('tabindex','0');
+      const aria = seat.tipLines.join('. ');
+      div.setAttribute('aria-label', `${seat.district}. ${aria}`);
+      div.style.cursor='pointer';
       div.addEventListener('mouseenter', e=>{
-        tooltip.innerHTML = `
-          <div class="district-name">${seat.district}</div>
-          ${seat.tipLines.map(l=>`<div>${l}</div>`).join('')}
-        `;
+        tooltip.innerHTML = `<div class="district-name">${seat.district}</div>${seat.tipLines.map(l=>`<div>${l}</div>`).join('')}`;
         showTooltipAt(e.clientX, e.clientY);
       });
       div.addEventListener('mousemove', e=>showTooltipAt(e.clientX, e.clientY));
-      div.addEventListener('mouseleave', ()=>{ tooltip.style.display='none'; });
+      div.addEventListener('mouseleave', ()=>{ if(!tooltipPinned) tooltip.style.display='none'; });
+      div.addEventListener('focus', ()=>{
+        const bb = div.getBoundingClientRect();
+        tooltip.innerHTML = `<div class="district-name">${seat.district}</div>${seat.tipLines.map(l=>`<div>${l}</div>`).join('')}`;
+        showTooltipAt(bb.right+8, bb.top+8);
+      });
+      div.addEventListener('blur', ()=>{ if(!tooltipPinned) tooltip.style.display='none'; });
+      div.addEventListener('click', e=>{ tooltipPinned=!tooltipPinned; if(!tooltipPinned) tooltip.style.display='none'; e.stopPropagation(); });
     }
-    cont.appendChild(div);
+    seatsRow.appendChild(div);
   });
 
   const declaredCount = slots.filter(s=>s && s.declared).length;
   qs('#seat-summary').textContent = `${declaredCount} / ${TOTAL} decided`;
+
+  // Update per-party counts line
+  qs('#sc-ndp-declared').textContent = fmtInt.format(ndpDeclared);
+  qs('#sc-ndp-leading').textContent  = fmtInt.format(ndpLeading);
+  qs('#sc-ulp-declared').textContent = fmtInt.format(ulpDeclared);
+  qs('#sc-ulp-leading').textContent  = fmtInt.format(ulpLeading);
+}
+
+function buildSeatTipLines(declaredN, declaredU, vN, vU){
+  const hasVotes = (vN+vU)>0;
+  const isTie = hasVotes && vN===vU;
+  const lead = Math.abs(vN - vU);
+  const lines = [];
+  const leader = vN>vU ? 'NDP' : (vU>vN ? 'ULP' : null);
+
+  if (declaredN && !declaredU){
+    if (leader==='NDP') lines.push(`NDP victory +${fmtInt.format(lead)}`); else lines.push(`NDP victory`);
+  } else if (declaredU && !declaredN){
+    if (leader==='ULP') lines.push(`ULP victory +${fmtInt.format(lead)}`); else lines.push(`ULP victory`);
+  } else if (declaredN && declaredU){
+    if (leader==='NDP') lines.push(`NDP victory +${fmtInt.format(lead)}`);
+    else if (leader==='ULP') lines.push(`ULP victory +${fmtInt.format(lead)}`);
+    else lines.push(`Declared (tie)`);
+  } else {
+    if (isTie) lines.push('Tie');
+    else if (leader) lines.push(`${leader} leading +${fmtInt.format(lead)}`);
+  }
+  return lines;
 }
 
 // ---------- Last updated ----------
 function renderLastUpdated(){
-  const el = qs('#last-updated');
-  if(!el) return;
   if(!state.lastUpdated){
-    el.textContent = 'Last updated: —';
+    lastUpdatedEl.textContent = 'Last updated: —';
     return;
   }
   const d = new Date(state.lastUpdated);
   const fmt = new Intl.DateTimeFormat(undefined, {
-    year:'numeric', month:'short', day:'2-digit',
-    hour:'numeric', minute:'2-digit'
+    year:'numeric', month:'short', day:'2-digit', hour:'numeric', minute:'2-digit'
   });
-  el.textContent = `Last updated: ${fmt.format(d)}`;
+  lastUpdatedEl.textContent = `Last updated: ${fmt.format(d)}`;
 }
 
 // ---------- Results polling ----------
 const RESULTS_URL = 'results.json';
 const POLL_MS = 7000;
+let hadFailure = false;
 
 function mergeResults(data){
   if(!data || !data.districts) return;
-
   if (data.updatedAt) state.lastUpdated = data.updatedAt;
 
   Object.entries(data.districts).forEach(([rawName, row])=>{
@@ -570,66 +557,90 @@ function mergeResults(data){
     const d = state.districts[name];
     if(!d) return;
 
-    // Two-column declaration model:
-    if (row.declared && typeof row.declared === 'object') {
-      d.declared = {
-        NDP: Number(row.declared.NDP || 0),
-        ULP: Number(row.declared.ULP || 0)
-      };
+    // declared object {NDP, ULP}
+    if (row.declared && typeof row.declared === 'object'){
+      d.declared = { NDP: Number(row.declared.NDP||0), ULP: Number(row.declared.ULP||0) };
     } else {
-      // backward compatibility (single numeric)
-      const single = Number(row.declared || 0);
-      d.declared = { NDP: 0, ULP: 0 };
-      if (single === 1) {
-        const nVotes = Number((row.NDP && row.NDP.votes) || 0);
-        const uVotes = Number((row.ULP && row.ULP.votes) || 0);
-        if (nVotes >= uVotes) d.declared.NDP = 1; else d.declared.ULP = 1;
+      // backward-compat (single number)
+      const single = Number(row.declared||0);
+      d.declared = { NDP:0, ULP:0 };
+      if (single===1){
+        const n = Number(row?.NDP?.votes||0);
+        const u = Number(row?.ULP?.votes||0);
+        if (n>=u) d.declared.NDP=1; else d.declared.ULP=1;
       }
     }
 
-    const setParty = (partyKey) => {
+    const setParty = (partyKey)=>{
       const entry = row[partyKey];
-      let votes = 0, swingStr = "0.0%";
-      if (typeof entry === 'number') {
-        votes = entry;
-      } else if (entry && typeof entry === 'object') {
-        votes = Number(entry.votes || 0);
-        if (entry.swing != null && entry.swing !== "") {
-          swingStr = String(entry.swing);
-        }
+      let votes=0, swingStr="0.0%";
+      if (typeof entry==='number'){ votes=entry; }
+      else if (entry && typeof entry==='object'){
+        votes = Number(entry.votes||0);
+        if (entry.swing!=null && entry.swing!=="") swingStr = String(entry.swing);
       }
-      const cand = (d.candidates || []).find(c=>c.party === partyKey);
-      if (cand) {
-        cand.votes = votes;
-        cand.swing = swingStr; // as-is from JSON
-      }
+      const cand = (d.candidates||[]).find(c=>c.party===partyKey);
+      if (cand){ cand.votes=votes; cand.swing=swingStr; }
     };
+    setParty('NDP'); setParty('ULP');
 
-    setParty("NDP");
-    setParty("ULP");
-
-    d.totalVotes = (d.candidates||[]).reduce((s,c)=> s + (c.votes||0), 0);
+    d.totalVotes = (d.candidates||[]).reduce((s,c)=>s+(c.votes||0),0);
   });
 }
 
 function startResultsPolling(){
   const tick = () => {
     fetch(`${RESULTS_URL}?t=${Date.now()}`)
-      .then(r => r.ok ? r.json() : null)
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(json => {
+        hadFailure = false;
+        reconnectEl.hidden = true;
         if (json) {
           mergeResults(json);
           applyResults();
         }
       })
-      .catch(()=>{})
+      .catch(()=> {
+        if (!hadFailure){
+          hadFailure = true;
+          reconnectEl.hidden = false;
+        }
+      })
       .finally(()=> setTimeout(tick, POLL_MS));
   };
   tick();
 }
 
-// ---------- Init ----------
+// ---------- SVG loader ----------
+function loadSVG(svgText){
+  svgWrapper.innerHTML = svgText;
+  const svg = svgWrapper.querySelector('svg');
+  if(!svg) return;
+
+  if(!svg.getAttribute('viewBox')){
+    const w = svg.getAttribute('width');
+    const h = svg.getAttribute('height');
+    if(w && h) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  }
+  svg.removeAttribute('width');
+  svg.removeAttribute('height');
+  svg.style.width = '100%';
+  svg.style.height = 'auto';
+
+  buildDistrictTargets(svg);
+  applyResults();
+}
+
+// ---------- Init & global keys ----------
+document.addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape'){
+    tooltipPinned = false;
+    tooltip.style.display = 'none';
+  }
+});
+
 document.addEventListener('DOMContentLoaded', ()=>{
+  // Load map.svg (lazy)
   const inlineSVG = svgWrapper.querySelector('svg');
   if (inlineSVG) {
     loadSVG(inlineSVG.outerHTML);
@@ -637,7 +648,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     fetch('map.svg', { cache: 'no-store' })
       .then(res => res.ok ? res.text() : null)
       .then(text => { if (text) loadSVG(text); })
-      .catch(() => {});
+      .catch(()=>{});
   }
+  // Start polling results
   startResultsPolling();
 });
