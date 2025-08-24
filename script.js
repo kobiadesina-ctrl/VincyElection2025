@@ -1,8 +1,7 @@
 /************************************************************
- * Election Map — tooltip declared row uses DECLARED color,
- * black text except swing colors, mobile-safe icon spacing,
- * swing formatted as +#.#% / -#.#% (no "-+"), ULP lead tint updated,
- * seat counts per party under seat chart, party banner with logos.
+ * Election Map — two-party declaration model (Y/AA),
+ * robust binding, coloring, z-order, legend, popular vote marker,
+ * #,### formatting, mobile-safe tooltip clamping, declaration icon.
  ************************************************************/
 
 // ---------- DOM helpers ----------
@@ -14,11 +13,10 @@ const fmtInt = new Intl.NumberFormat('en-US');
 // ---------- Global state ----------
 let state = {
   parties: {
-    "Unity Labour Party": { color: "#ed2633" },     // ULP declared color
-    "New Democratic Party": { color: "#f5c02c" }    // NDP declared color
+    "Unity Labour Party": { color: "#ed2633" }, // ULP declared color
+    "New Democratic Party": { color: "#f5c02c" } // NDP declared color
   },
-  // Leading (not declared) tints
-  leadTint: { ULP: "#fedfad", NDP: "#fedda6" },     // ULP updated per request
+  leadTint: { ULP: "#f77e81", NDP: "#fedda6" }, // leading but not declared
   districts: {},
   totalSeats: 15,
   lastUpdated: null
@@ -101,8 +99,11 @@ const NAME_TO_LABEL = {
 };
 const canonicalName = raw => ID_TO_NAME[raw] || raw;
 
-// ---------- SVG district mapping ----------
+// ---------- SVG district mapping (robust) ----------
+/** Map<"NW", Array<paintable elements>> */
 let districtTargets = new Map();
+
+// for z-order restore
 const originalOrder = new WeakMap(); // element -> { parent, nextSibling }
 
 function isMarker(el) { return el && el.hasAttribute('id') && el.hasAttribute('data-district'); }
@@ -112,13 +113,14 @@ function isPaintable(el) {
   return t === 'path' || t === 'polygon' || t === 'rect' || t === 'ellipse' || t === 'circle';
 }
 
+/** hover handlers that also handle z-order bring-to-front and restore */
 function attachHover(key, targets) {
   const enter = e => {
     const name = canonicalName(key);
     renderTooltipFor(name);
     showTooltipAt(e.clientX, e.clientY);
 
-    // bring to front
+    // elevate to front: remember positions and append to parent
     targets.forEach(t => {
       if (!originalOrder.has(t)) originalOrder.set(t, { parent: t.parentNode, next: t.nextSibling });
       t.parentNode.appendChild(t);
@@ -127,6 +129,7 @@ function attachHover(key, targets) {
   };
   const leave = () => {
     tooltip.style.display = 'none';
+    // restore original positions
     targets.forEach(t => {
       const rec = originalOrder.get(t);
       if (rec && rec.parent) rec.parent.insertBefore(t, rec.next);
@@ -143,12 +146,15 @@ function attachHover(key, targets) {
   });
 }
 
+/** primary: assign paintables that follow marker order */
 function buildTargetsByOrder(svg) {
   const map = new Map();
   const ordered = Array.from(svg.querySelectorAll('[id][data-district], path, polygon, rect, ellipse, circle'));
+
   let currentKey = null;
   for (let i = 0; i < ordered.length; i++) {
     const el = ordered[i];
+
     if (isMarker(el)) {
       currentKey = el.getAttribute('id') || el.getAttribute('data-district');
       if (!map.has(currentKey)) map.set(currentKey, []);
@@ -166,6 +172,7 @@ function buildTargetsByOrder(svg) {
   return map;
 }
 
+/** fallback: find by inkscape:label equals district label */
 function fallbackByInkscapeLabel(svg, key) {
   const name = canonicalName(key);
   const label = NAME_TO_LABEL[name];
@@ -186,6 +193,7 @@ function fallbackByInkscapeLabel(svg, key) {
   return paints;
 }
 
+/** fallback: heuristic id/class contains label words */
 function fallbackByHeuristic(svg, key) {
   const name = canonicalName(key);
   const words = (NAME_TO_LABEL[name] || name).toLowerCase().split(/\s+/).filter(Boolean);
@@ -203,8 +211,10 @@ function fallbackByHeuristic(svg, key) {
   return paints;
 }
 
+/** Build districtTargets map with fallbacks & attach hover */
 function buildDistrictTargets(svg) {
   districtTargets = buildTargetsByOrder(svg);
+
   const expectedKeys = Object.keys(ID_TO_NAME);
   expectedKeys.forEach(key => {
     if (!districtTargets.has(key) || districtTargets.get(key).length === 0) {
@@ -216,6 +226,7 @@ function buildDistrictTargets(svg) {
       }
     }
   });
+
   districtTargets.forEach((targets, key) => {
     if (!targets || targets.length === 0) {
       console.warn(`[map] No shapes found for district key "${key}".`);
@@ -223,30 +234,6 @@ function buildDistrictTargets(svg) {
     }
     attachHover(key, targets);
   });
-}
-
-// ---------- Utils ----------
-function hexToRGBA(hex, a=0.22){
-  // supports #rgb or #rrggbb
-  let h = hex.replace('#','');
-  if (h.length===3) h = h.split('').map(c=>c+c).join('');
-  const r = parseInt(h.slice(0,2),16);
-  const g = parseInt(h.slice(2,4),16);
-  const b = parseInt(h.slice(4,6),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-// Swing: normalize for display only (+ added to non-negative, clean "-+")
-function formatSwingDisplay(raw){
-  if (raw == null || raw === "") return "0.0%";
-  const s = String(raw).trim().replace(/^\-\+/, "-").replace(/^\+?\+/, "+");
-  // extract sign & number
-  const m = s.match(/^([+\-]?)(\d+(\.\d+)?)/);
-  if (!m) return s; // leave as-is if not parseable
-  const num = parseFloat((m[1] === "-" ? "-" : "") + m[2]);
-  const val = isNaN(num) ? 0 : num;
-  const sign = val < 0 ? "-" : "+";
-  return `${sign}${Math.abs(val).toFixed(1)}%`;
 }
 
 // ---------- SVG loader ----------
@@ -278,12 +265,16 @@ function showTooltipAt(clientX, clientY){
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
+  // default to right/below cursor
   let left = clientX + 12;
   let top = clientY + 12;
 
+  // flip horizontally if overflow
   if (left + tw + pad > vw) left = clientX - tw - 12;
+  // flip vertically if overflow
   if (top + th + pad > vh) top = clientY - th - 12;
 
+  // clamp inside viewport
   left = Math.max(pad, Math.min(left, vw - tw - pad));
   top  = Math.max(pad, Math.min(top,  vh - th - pad));
 
@@ -291,7 +282,7 @@ function showTooltipAt(clientX, clientY){
   tooltip.style.top = top + 'px';
 }
 
-// ---------- Tooltip renderer ----------
+// ---------- Tooltip renderer (declared icon, #,### votes) ----------
 function renderTooltipFor(districtName){
   const info = state.districts[districtName] || {
     name: districtName, declared: {NDP:0,ULP:0}, candidates: [], totalVotes: 0
@@ -300,54 +291,33 @@ function renderTooltipFor(districtName){
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
 
-  // votes to determine leader (for info only)
-  const ndp = candidates.find(c=>c.party==='NDP') || { votes:0, swing:"0.0%" };
-  const ulp = candidates.find(c=>c.party==='ULP') || { votes:0, swing:"0.0%" };
-  const vN = Number(ndp.votes||0), vU = Number(ulp.votes||0);
-  const hasVotes = (vN + vU) > 0;
-  const isTie = hasVotes && vN === vU;
-
-  // Declared party (if any)
-  const declaredN = Number(info.declared?.NDP||0) === 1;
-  const declaredU = Number(info.declared?.ULP||0) === 1;
-  let declaredParty = null;
-  if (declaredN && !declaredU) declaredParty = 'NDP';
-  else if (declaredU && !declaredN) declaredParty = 'ULP';
-  else if (declaredN && declaredU) {
-    if (vN > vU) declaredParty = 'NDP';
-    else if (vU > vN) declaredParty = 'ULP';
+  // winner by votes (not necessarily declared)
+  let winnerParty = null;
+  if (candidates.length) {
+    const sorted = [...candidates].sort((a,b)=> (b.votes||0)-(a.votes||0));
+    if ((sorted[0].votes||0) > (sorted[1]?.votes||0)) winnerParty = sorted[0].party;
   }
 
-  // Declared row background = DECLARED color (semi-transparent)
-  const declaredBg = declaredParty
-    ? hexToRGBA(state.parties[declaredParty].color, 0.22)
-    : 'transparent';
-
-  // Order rows: declared first if exists
-  const order = declaredParty ? [declaredParty, declaredParty === 'NDP' ? 'ULP' : 'NDP'] : ['NDP','ULP'];
-
   const partyColor = p => (state.parties[p] && state.parties[p].color) || '#999';
-  const swingClass = s => (typeof s === 'string' && s.trim().startsWith('-')) ? 'swing-neg'
-                       : (typeof s === 'string' && s.trim().startsWith('+')) ? 'swing-pos'
-                       : 'swing-zero';
+  const swingClass = s => s?.trim().startsWith('+') ? 'swing-pos' : (s?.trim().startsWith('-') ? 'swing-neg' : 'swing-zero');
   const fmtPct = (v, t) => t ? ((v || 0) / t * 100).toFixed(1) : '0.0';
+  const normSwing = s => {
+    if (typeof s !== 'string') return '0.0%';
+    const m = s.trim().match(/^([+\-]?)(\d+(\.\d+)?)/);
+    if (m) return `${m[1] || (parseFloat(m[2]) === 0 ? '' : '+')}${(+m[2]).toFixed(1)}%`;
+    return '0.0%';
+  };
 
-  const rows = order.map(p=>{
-    const c = (p === 'NDP') ? ndp : ulp;
+  const rows = candidates.length ? candidates.map(c=>{
     const pct = fmtPct(c.votes, total);
-    const sw = formatSwingDisplay(c.swing); // enforce + for non-negative, clean "-+"
-    const isDeclaredForParty = (info.declared?.[p] === 1 || info.declared?.[p] === '1');
+    const sw = normSwing(c.swing);
+    const isDeclaredForParty = (info.declared?.[c.party] === 1 || info.declared?.[c.party] === '1');
     const declaredIcon = isDeclaredForParty ? `<img src="Declaration.svg" alt="Declared" class="declared-icon" />` : '';
-
-    const isDeclRow = (declaredParty === p);
-    const rowCls = isDeclRow ? ' tt-row--declared' : '';
-    const rowStyle = isDeclRow ? ` style="background:${declaredBg}"` : '';
-
     return `
-      <div class="tt-row${rowCls}"${rowStyle}>
+      <div class="tt-row">
         <div class="tt-col party-cell">
-          <span class="party-chip" style="background:${partyColor(p)}"></span>
-          <span class="party-name">${p}</span>
+          <span class="party-chip" style="background:${partyColor(c.party)}"></span>
+          <span class="party-name">${c.party}</span>
         </div>
         <div class="tt-col candidate-cell">
           <span class="candidate-name">${c.name || '—'}</span>
@@ -358,7 +328,7 @@ function renderTooltipFor(districtName){
         <div class="tt-col swing-cell ${swingClass(sw)}">${sw}</div>
       </div>
     `;
-  }).join('');
+  }).join('') : '<div style="color:var(--muted)">No results yet.</div>';
 
   tooltip.innerHTML = `
     <div class="district-name">${info.name || districtName}</div>
@@ -405,10 +375,10 @@ function applyResults(){
       } else if (declaredU && !declaredN) {
         fillColor = state.parties['ULP']?.color || '#999';
       } else if (declaredN && declaredU) {
-        // contradictory; choose higher votes if any, else black
+        // contradictory; choose higher votes if any, else default grey
         if (vN > vU) fillColor = state.parties['NDP']?.color || '#999';
         else if (vU > vN) fillColor = state.parties['ULP']?.color || '#999';
-        else fillColor = '#000000';
+        else fillColor = '#000000'; // both declared but tie -> black
       } else {
         // no declaration: use leading tint if any
         if (!hasVotes) fillColor = targets[0].dataset.origfill || '#d7d7d7';
@@ -427,7 +397,7 @@ function applyResults(){
   renderLastUpdated();
 }
 
-// ---------- Popular vote ----------
+// ---------- Popular vote (2 segments) ----------
 function renderPopularVote(){
   const partyTotals = {};
   let totalVotes = 0;
@@ -462,7 +432,7 @@ function renderPopularVote(){
   qs('#pv-total').textContent = `${fmtInt.format(total || 0)} votes`;
 }
 
-// ---------- Seat row & counts ----------
+// ---------- Seat row (pack left/right; blanks center) ----------
 function renderSeatRow(){
   const cont = qs('#seats-row');
   if (!cont) return;
@@ -470,9 +440,6 @@ function renderSeatRow(){
 
   const ndpSeats = [];
   const ulpSeats = [];
-
-  // counts
-  let ndpDeclared = 0, ulpDeclared = 0, ndpLeading = 0, ulpLeading = 0;
 
   Object.entries(state.districts).forEach(([id,d])=>{
     const ndp = (d.candidates||[]).find(c=>c.party==='NDP') || {votes:0};
@@ -483,40 +450,39 @@ function renderSeatRow(){
 
     const hasVotes = (vN+vU)>0;
     const isTie = vN === vU && hasVotes;
-
-    if (declaredN) ndpDeclared++;
-    if (declaredU) ulpDeclared++;
-    if (!declaredN && !declaredU && hasVotes && !isTie){
-      if (vN > vU) ndpLeading++;
-      else if (vU > vN) ulpLeading++;
-    }
-
-    if (!hasVotes) return;                          // no result -> blank
+    if (!hasVotes) return;           // no result -> blank
     if (isTie && !declaredN && !declaredU) return; // tie w/o declaration -> blank
 
     const lead = Math.abs(vN - vU);
 
-    // seat belongs to declared party if declared, else leader
-    let party = null, declaredFlag=false, color;
+    // Determine which party this seat belongs to on the row:
+    // priority: declared party if any; else leading party
+    let bucket = null;
+    let color, declaredFlag=false, party=null, labelParty=null;
+
     if (declaredN && !declaredU) { party='NDP'; declaredFlag=true; color=state.parties['NDP']?.color||'#999'; }
     else if (declaredU && !declaredN) { party='ULP'; declaredFlag=true; color=state.parties['ULP']?.color||'#999'; }
     else if (declaredN && declaredU) {
+      // contradictory: choose higher votes else mark tie (skip)
       if (vN > vU) { party='NDP'; declaredFlag=true; color=state.parties['NDP']?.color||'#999'; }
       else if (vU > vN) { party='ULP'; declaredFlag=true; color=state.parties['ULP']?.color||'#999'; }
-      else return; // both declared & tie -> skip
+      else return; // both declared and tie -> skip from seat row
     } else {
+      // no declarations: use leader if not tie
       if (vN > vU) { party='NDP'; color=state.leadTint.NDP; }
       else if (vU > vN) { party='ULP'; color=state.leadTint.ULP; }
-      else return; // tie but not declared -> skip
+      else return; // tie but has votes => skip (stays blank)
     }
 
-    // tooltip lines for the seat square
+    // Prepare tooltip lines per spec
+    const declaredText = declaredN ? 'NDP' : (declaredU ? 'ULP' : null);
     let tipLines = [];
-    const declText = declaredN ? 'NDP' : (declaredU ? 'ULP' : null);
-    if (declText && ((party==='NDP' && vN>=vU) || (party==='ULP' && vU>=vN))) {
-      tipLines.push(`${declText} victory +${fmtInt.format(lead)}`);
-    } else if (declText) {
-      tipLines.push(`${declText} victory`);
+    if (declaredText && ((party==='NDP' && vN>=vU) || (party==='ULP' && vU>=vN))) {
+      // declared and currently leading (or equal) for that party
+      tipLines.push(`${declaredText} victory +${fmtInt.format(lead)}`);
+    } else if (declaredText) {
+      tipLines.push(`${declaredText} victory`);
+      // leader may be opposite if not tie
       if (!isTie) {
         const leadingText = (vN > vU) ? 'NDP' : 'ULP';
         tipLines.push(`${leadingText} leading +${fmtInt.format(lead)}`);
@@ -528,7 +494,10 @@ function renderSeatRow(){
       else tipLines.push(`${party} leading +${fmtInt.format(lead)}`);
     }
 
-    const seatObj = { district: d.name || id, party, declared: declaredFlag, lead, color, tipLines };
+    const seatObj = {
+      district: d.name || id, party, declared: declaredFlag, lead, color, tipLines
+    };
+
     if (party === 'NDP') ndpSeats.push(seatObj);
     else ulpSeats.push(seatObj);
   });
@@ -571,12 +540,6 @@ function renderSeatRow(){
 
   const declaredCount = slots.filter(s=>s && s.declared).length;
   qs('#seat-summary').textContent = `${declaredCount} / ${TOTAL} decided`;
-
-  // Update party seat counts
-  qs('#sc-ndp-declared').textContent = fmtInt.format(ndpDeclared);
-  qs('#sc-ndp-leading').textContent  = fmtInt.format(ndpLeading);
-  qs('#sc-ulp-declared').textContent = fmtInt.format(ulpDeclared);
-  qs('#sc-ulp-leading').textContent  = fmtInt.format(ulpLeading);
 }
 
 // ---------- Last updated ----------
@@ -589,8 +552,8 @@ function renderLastUpdated(){
   }
   const d = new Date(state.lastUpdated);
   const fmt = new Intl.DateTimeFormat(undefined, {
-      year:'numeric', month:'short', day:'2-digit',
-      hour:'numeric', minute:'2-digit'
+    year:'numeric', month:'short', day:'2-digit',
+    hour:'numeric', minute:'2-digit'
   });
   el.textContent = `Last updated: ${fmt.format(d)}`;
 }
@@ -598,6 +561,21 @@ function renderLastUpdated(){
 // ---------- Results polling ----------
 const RESULTS_URL = 'results.json';
 const POLL_MS = 7000;
+
+function normalizeSwing(val){
+  if (val == null) return "0.0%";
+  if (typeof val === 'string') {
+    const m = val.trim().match(/^([+\-]?)(\d+(\.\d+)?)/);
+    if (!m) return "0.0%";
+    const sign = m[1] || (parseFloat(m[2])===0 ? '' : '+');
+    return `${sign}${(+m[2]).toFixed(1)}%`;
+  }
+  if (typeof val === 'number') {
+    const sign = val === 0 ? '' : (val > 0 ? '+' : '');
+    return `${sign}${Math.abs(val).toFixed(1)}%`;
+  }
+  return "0.0%";
+}
 
 function mergeResults(data){
   if(!data || !data.districts) return;
@@ -609,17 +587,18 @@ function mergeResults(data){
     const d = state.districts[name];
     if(!d) return;
 
-    // Two-column declaration model:
+    // New two-column declaration model:
     if (row.declared && typeof row.declared === 'object') {
       d.declared = {
         NDP: Number(row.declared.NDP || 0),
         ULP: Number(row.declared.ULP || 0)
       };
     } else {
-      // backward compatibility (single numeric)
+      // backward compatibility (if old {declared: 0/1} arrives)
       const single = Number(row.declared || 0);
       d.declared = { NDP: 0, ULP: 0 };
       if (single === 1) {
+        // pick winner by votes if present
         const nVotes = Number((row.NDP && row.NDP.votes) || 0);
         const uVotes = Number((row.ULP && row.ULP.votes) || 0);
         if (nVotes >= uVotes) d.declared.NDP = 1; else d.declared.ULP = 1;
@@ -628,19 +607,17 @@ function mergeResults(data){
 
     const setParty = (partyKey) => {
       const entry = row[partyKey];
-      let votes = 0, swingStr = "0.0%";
+      let votes = 0, swing = "0.0%";
       if (typeof entry === 'number') {
         votes = entry;
       } else if (entry && typeof entry === 'object') {
         votes = Number(entry.votes || 0);
-        if (entry.swing != null && entry.swing !== "") {
-          swingStr = String(entry.swing);
-        }
+        swing = normalizeSwing(entry.swing);
       }
       const cand = (d.candidates || []).find(c=>c.party === partyKey);
       if (cand) {
         cand.votes = votes;
-        cand.swing = swingStr; // store raw; display will format
+        cand.swing = swing;
       }
     };
 
