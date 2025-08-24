@@ -9,73 +9,39 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Live Election Results</h1>
-      <div id="last-updated" class="muted" aria-live="polite">Last updated: —</div>
+      <h1>2025 Election Map</h1>
     </header>
 
-    <!-- Top: Party banner + Popular vote + Seat Row -->
-    <section class="top-widgets">
+    <!-- Popular Vote + Seat Row (same width) -->
+    <section class="top-widgets" style="margin-top:14px">
       <div id="popular-vote" class="card pv-card">
-        <!-- Party banner -->
-        <div class="party-banner" aria-hidden="true">
-          <div class="pb-left">
-            <img src="NDP logo.png" alt="" class="pb-logo" />
-            <span class="pb-acronym">NDP</span>
-          </div>
-          <div class="pb-right">
-            <span class="pb-acronym">ULP</span>
-            <img src="ULP logo.png" alt="" class="pb-logo" />
-          </div>
-        </div>
-
         <div class="pv-header">
           <strong>Popular Vote</strong>
           <div class="pv-meta">
             <small id="pv-total" class="muted">0 votes</small>
+            <span class="dot-sep">•</span>
+            <small id="last-updated" class="muted">Last updated: —</small>
           </div>
         </div>
 
+        <!-- Popular vote stack (fixed width container) -->
         <div class="pv-wrap">
           <!-- 50% marker above the bar ONLY -->
           <div class="pv-50vline" aria-hidden="true"></div>
           <div class="pv-50caret" aria-hidden="true">▼</div>
           <div class="pv-50label-top">50%</div>
 
-          <div class="pv-bar is-loading" id="pv-bar" aria-label="Popular vote stacked bar">
+          <div class="pv-bar" id="pv-bar">
             <!-- segments injected by JS -->
           </div>
         </div>
 
         <!-- Seat count row (same width as pv-bar) -->
         <div class="seats-wrap">
-          <div id="seats-row" class="seats-row is-loading" aria-label="Seat count">
+          <div id="seats-row" class="seats-row" aria-label="Seat count">
             <!-- 15 squares injected by JS -->
           </div>
           <div id="seat-summary" class="muted seat-summary">0 / 15 decided</div>
-        </div>
-
-        <!-- Seat totals per party -->
-        <div class="seat-counts" aria-label="Seat totals by party">
-          <div class="seat-count ndp">
-            <div class="sc-title">
-              <span class="sc-dot ndp-dot" aria-hidden="true"></span> NDP
-            </div>
-            <div class="sc-line">
-              <span>Declared:</span> <strong id="sc-ndp-declared">0</strong>
-              <span class="dot-sep">•</span>
-              <span>Leading:</span> <strong id="sc-ndp-leading">0</strong>
-            </div>
-          </div>
-          <div class="seat-count ulp">
-            <div class="sc-title">
-              <span class="sc-dot ulp-dot" aria-hidden="true"></span> ULP
-            </div>
-            <div class="sc-line">
-              <span>Declared:</span> <strong id="sc-ulp-declared">0</strong>
-              <span class="dot-sep">•</span>
-              <span>Leading:</span> <strong id="sc-ulp-leading">0</strong>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -83,8 +49,8 @@
     <!-- Map + Right column -->
     <div class="layout">
       <div id="map-area" class="card">
-        <div id="svg-wrapper" aria-label="Constituency map">
-          <!-- map.svg injected by script.js -->
+        <div id="svg-wrapper">
+          <!-- map.svg will be injected here by script.js -->
         </div>
       </div>
 
@@ -92,7 +58,7 @@
         <div class="card">
           <label>Legend</label>
 
-          <!-- Legend matrix: Party name | Declared | Leading -->
+          <!-- Legend grid: Party name | Declared | Leading -->
           <div class="legend-matrix">
             <div class="lm-blank"></div>
             <div class="lm-head lm-declared">Declared</div>
@@ -124,16 +90,10 @@
       </aside>
     </div>
 
-    <!-- Tooltip -->
-    <div id="tooltip" class="tooltip" role="dialog" aria-modal="false" style="display:none"></div>
-
-    <!-- Reconnect banner -->
-    <div id="reconnect" class="reconnect" role="status" aria-live="polite" hidden>
-      Trying to reconnect to live results…
-    </div>
+    <div id="tooltip" class="tooltip" style="display:none"></div>
 
     <footer>
-      Live election updates: hover or focus a district to view candidates and results. Tap once to pin on mobile; tap outside to close.
+      Live election updates: hover over a district to view candidates and results.
     </footer>
   </div>
 
