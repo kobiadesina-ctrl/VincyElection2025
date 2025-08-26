@@ -15,7 +15,6 @@ const svgWrapper = qs('#svg-wrapper');
 const tooltip = qs('#tooltip');
 const fmtInt = new Intl.NumberFormat('en-US');
 
-
 // ---------- Global state ----------
 let state = {
   parties: {
@@ -402,8 +401,7 @@ function applyResults(){
   });
 
   renderPopularVote();
-    renderSeatRow();
-  renderPartyTable();
+  renderSeatRow();
   renderLastUpdated();
 }
 
@@ -558,77 +556,6 @@ function renderLastUpdated(){
   el.textContent = `Last updated: ${fmt.format(d)}`;
 }
 
-
-// ---------- Party summary table (Declared / Leading / Total + Popular vote) ----------
-function renderPartyTable(){
-  const tbody = qs('#party-table tbody');
-  if (!tbody) return;
-
-  // Tot up votes and seat states
-  const tallies = { NDP: {declared:0, leading:0, votes:0}, ULP: {declared:0, leading:0, votes:0} };
-  Object.values(state.districts).forEach(d => {
-    const ndp = (d.candidates||[]).find(c=>c.party==='NDP') || {votes:0};
-    const ulp = (d.candidates||[]).find(c=>c.party==='ULP') || {votes:0};
-    const vN = Number(ndp.votes||0), vU = Number(ulp.votes||0);
-    const declaredN = Number(d.declared?.NDP||0) === 1;
-    const declaredU = Number(d.declared?.ULP||0) === 1;
-
-    tallies.NDP.votes += vN; tallies.ULP.votes += vU;
-
-    // Declared winner logic (two-column model). If both declared, prefer higher votes; ignore if tie.
-    let declared = null;
-    if (declaredN && !declaredU) declared = 'NDP';
-    else if (declaredU && !declaredN) declared = 'ULP';
-    else if (declaredN && declaredU) {
-      if (vN > vU) declared = 'NDP';
-      else if (vU > vN) declared = 'ULP';
-    }
-    if (declared) tallies[declared].declared++;
-
-    // Leading (only if no declared)
-    if (!declared){
-      if (vN > vU) tallies.NDP.leading++;
-      else if (vU > vN) tallies.ULP.leading++;
-    }
-  });
-
-  const totalVotes = tallies.NDP.votes + tallies.ULP.votes;
-  const pct = p => totalVotes ? (p/totalVotes*100) : 0;
-
-  const rows = [
-    {
-      key: 'ULP',
-      name: 'Unity Labour Party',
-      logo: 'ULP logo.png',
-      d: tallies.ULP
-    },
-    {
-      key: 'NDP',
-      name: 'New Democratic Party',
-      logo: 'NDP logo.png',
-      d: tallies.NDP
-    }
-  ].map(row => {
-    const totalSeats = row.d.declared + row.d.leading;
-    return \`
-      <tr>
-        <td class="pt-cell">
-          <div class="pt-party">
-            <img src="\${row.logo}" alt="\${row.key} logo" loading="lazy" />
-            <span>\${row.name}</span>
-          </div>
-        </td>
-        <td class="pt-cell pt-seats">\${row.d.declared}</td>
-        <td class="pt-cell pt-seats">\${row.d.leading}</td>
-        <td class="pt-cell pt-seats pt-total">\${totalSeats}</td>
-        <td class="pt-cell pt-pv">\${fmtInt.format(row.d.votes)}</td>
-        <td class="pt-cell pt-pct">\${pct(row.d.votes).toFixed(1)}%</td>
-      </tr>
-    \`;
-  }).join('');
-
-  tbody.innerHTML = rows;
-}
 // ---------- Results polling ----------
 const RESULTS_URL = 'results.json';
 const POLL_MS = 7000;
@@ -709,7 +636,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   } else {
     fetch('map.svg', { cache: 'no-store' })
       .then(res => res.ok ? res.text() : null)
-      .then(text => { if (text) loadSVG(text); else null; })
+      .then(text => { if (text) loadSVG(text); })
       .catch(() => {});
   }
   startResultsPolling();
