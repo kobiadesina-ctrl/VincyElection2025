@@ -14,39 +14,37 @@
 
     <!-- Popular Vote + Seat Row (same width) -->
     <section class="top-widgets" style="margin-top:14px">
-      <div id="popular-vote" class="card pv-card">
+      <div class="pv-wrap card pv-card">
         <div class="pv-header">
-          <strong>Popular Vote</strong>
+          <div class="pv-title">Popular vote</div>
           <div class="pv-meta">
-            <small id="pv-total" class="muted">0 votes</small>
+            <span id="pv-total" class="muted">0 votes</span>
             <span class="dot-sep">•</span>
-            <small id="last-updated" class="muted">Last updated: —</small>
+            <span id="last-updated" class="muted">Last updated: —</span>
           </div>
         </div>
 
-        <!-- Popular vote stack (fixed width container) -->
-        <div class="pv-wrap">
-          <!-- 50% marker above the bar ONLY -->
-          <div class="pv-50vline" aria-hidden="true"></div>
-          <div class="pv-50caret" aria-hidden="true">▼</div>
-          <div class="pv-50label-top">50%</div>
+        <div class="pv-bar-wrap">
+          <div class="pv-50">
+            <div class="pv-50-line"></div>
+            <div class="pv-50-caret">▼</div>
+          </div>
+          <div id="pv-bar" class="pv-bar"></div>
+        </div>
+      </div>
 
-          <div class="pv-bar" id="pv-bar">
-            <!-- segments injected by JS -->
+      <div class="seats-wrap card">
+        <div class="seats-header">
+          <div class="seats-title">Seats (15)</div>
+          <div class="seats-legend">
+            <span class="seat-key ndp">NDP</span>
+            <span class="seat-key ulp">ULP</span>
           </div>
         </div>
-
-        <!-- Seat count row (same width as pv-bar) -->
-        <div class="seats-wrap">
-          <div id="seats-row" class="seats-row" aria-label="Seat count">
-            <!-- 15 squares injected by JS -->
-          </div>
-          <div id="seat-summary" class="muted seat-summary">0 / 15 decided</div>
-        </div>
+        <div id="seats-row" class="seats-row" aria-label="Seat chart"></div>
       </div>
     </section>
 
-    <!-- Map + Right column -->
     <div class="layout">
       <div id="map-area" class="card">
         <div id="svg-wrapper">
@@ -76,6 +74,31 @@
               <div class="lm-swatch ndp-leading" title="NDP Leading"></div>
             </div>
           </div>
+        </div>
+
+        <!-- Party summary table -->
+        <div class="card party-table-card">
+          <table class="party-table" id="party-table" aria-label="Party summary">
+            <thead>
+              <tr>
+                <th class="pt-party-col"></th>
+                <th class="pt-group" colspan="3">Seats</th>
+                <th class="pt-pv">Popular vote</th>
+                <th class="pt-pct">%</th>
+              </tr>
+              <tr class="pt-subhead">
+                <th></th>
+                <th>Declared</th>
+                <th>Leading</th>
+                <th>Total</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Filled by script.js: renderPartyTable() -->
+            </tbody>
+          </table>
         </div>
 
         <!-- Swing infobox -->
