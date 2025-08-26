@@ -92,24 +92,3 @@ label{font-size:13px;color:var(--muted)}
   .pv-wrap,.seats-wrap{max-width:100%}
   .tooltip{width:min(90vw,380px)}
 }
-
-
-/* Party summary table */
-.party-table-card{margin-top:12px}
-.party-table{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:14px}
-.party-table thead th{font-weight:600;color:#444;text-align:center}
-.party-table thead .pt-party-col{text-align:left}
-.party-table .pt-subhead th{font-weight:500;color:var(--muted);border-bottom:1px solid #eee;padding-bottom:6px}
-.party-table tbody tr{background:#fafafa}
-.party-table tbody tr .pt-cell{padding:8px 10px;vertical-align:middle}
-.party-table .pt-party{display:flex;align-items:center;gap:10px;font-weight:600}
-.party-table .pt-party img{width:22px;height:22px;object-fit:contain;display:block}
-.party-table .pt-seats, .party-table .pt-pv, .party-table .pt-pct{text-align:right;font-variant-numeric:tabular-nums}
-.party-table .pt-total{opacity:.9}
-.party-table tbody tr:nth-child(1){background:#fff5f6} /* ULP row tint */
-.party-table tbody tr:nth-child(2){background:#fffaf0} /* NDP row tint */
-
-@media (max-width:980px){
-  .party-table{font-size:13px}
-  .party-table .pt-party img{width:18px;height:18px}
-}
