@@ -609,7 +609,7 @@ function renderPartyTable(){
     }
   ].map(row => {
     const totalSeats = row.d.declared + row.d.leading;
-    return \`
+    return \
       <tr>
         <td class="pt-cell">
           <div class="pt-party">
@@ -623,7 +623,7 @@ function renderPartyTable(){
         <td class="pt-cell pt-pv">\${fmtInt.format(row.d.votes)}</td>
         <td class="pt-cell pt-pct">\${pct(row.d.votes).toFixed(1)}%</td>
       </tr>
-    \`;
+    \;
   }).join('');
 
   tbody.innerHTML = rows;
