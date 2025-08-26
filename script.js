@@ -15,6 +15,7 @@ const svgWrapper = qs('#svg-wrapper');
 const tooltip = qs('#tooltip');
 const fmtInt = new Intl.NumberFormat('en-US');
 
+
 // ---------- Global state ----------
 let state = {
   parties: {
@@ -609,7 +610,7 @@ function renderPartyTable(){
     }
   ].map(row => {
     const totalSeats = row.d.declared + row.d.leading;
-    return \
+    return \`
       <tr>
         <td class="pt-cell">
           <div class="pt-party">
@@ -623,7 +624,7 @@ function renderPartyTable(){
         <td class="pt-cell pt-pv">\${fmtInt.format(row.d.votes)}</td>
         <td class="pt-cell pt-pct">\${pct(row.d.votes).toFixed(1)}%</td>
       </tr>
-    \;
+    \`;
   }).join('');
 
   tbody.innerHTML = rows;
@@ -708,7 +709,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   } else {
     fetch('map.svg', { cache: 'no-store' })
       .then(res => res.ok ? res.text() : null)
-      .then(text => { if (text) loadSVG(text); })
+      .then(text => { if (text) loadSVG(text); else null; })
       .catch(() => {});
   }
   startResultsPolling();
