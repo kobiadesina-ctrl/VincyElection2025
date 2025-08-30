@@ -343,14 +343,14 @@ function renderTooltipFor(districtName){
       <div class="tt-row${declaredRowClass}"${declaredRowStyle}>
         <div class="tt-col party-cell">
           <span class="party-chip" style="background:${partyColor(p)}"></span>
-          <span class="party-name">${p}</span>
+          <span class="party-name" style="color:#000">${p}</span>
         </div>
         <div class="tt-col candidate-cell">
-          <span class="candidate-name">${c.name || '—'}</span>
+          <span class="candidate-name" style="color:#000">${c.name || '—'}</span>
           ${declaredIcon}
         </div>
-        <div class="tt-col votes-cell">${fmtInt.format(c.votes || 0)}</div>
-        <div class="tt-col share-cell">${pct}%</div>
+        <div class="tt-col votes-cell" style="color:#000">${fmtInt.format(c.votes || 0)}</div>
+        <div class="tt-col share-cell" style="color:#000">${pct}%</div>
         <div class="tt-col swing-cell ${swingClass(sw)}">${sw}</div>
       </div>
     `;
@@ -658,5 +658,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
+
 
 
