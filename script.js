@@ -557,7 +557,7 @@ function renderLastUpdated(){
 }
 
 // ---------- Results polling ----------
-const RESULTS_URL = 'results.json';
+const RESULTS_URL = 'https://script.google.com/macros/s/AKfycbxONF33uGiv4LVMOGkK_AdXKjCSnJvZyUH3jqeh2xzgUd7QGFahSmYB90l4k8RPYEasjw/exec';
 const POLL_MS = 7000;
 
 function mergeResults(data){
@@ -641,3 +641,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
+
