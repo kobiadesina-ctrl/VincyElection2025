@@ -15,6 +15,21 @@ const svgWrapper = qs('#svg-wrapper');
 const tooltip = qs('#tooltip');
 const fmtInt = new Intl.NumberFormat('en-US');
 
+// Normalize swing: "+#.#%" for non-negative, "-#.#%" for negative.
+// Also fixes accidental "-+..." or "++..." artifacts coming from data.
+function formatSwingDisplay(raw){
+  if (raw == null || raw === "") return "0.0%";
+  const s = String(raw).trim()
+    .replace(/^\-\+/, "-")  // "-+1.2%" -> "-1.2%"
+    .replace(/^\+\+/, "+"); // "++1.2%" -> "+1.2%"
+  const m = s.match(/^([+\-]?)(\d+(\.\d+)?)/);
+  if (!m) return s;
+  const num = parseFloat((m[1] === "-" ? "-" : "") + m[2]);
+  if (isNaN(num)) return "0.0%";
+  const sign = num < 0 ? "-" : "+";
+  return `${sign}${Math.abs(num).toFixed(1)}%`;
+}
+
 // ---------- Global state ----------
 let state = {
   parties: {
@@ -315,12 +330,14 @@ function renderTooltipFor(districtName){
   const rows = order.map(p=>{
     const c = (p === 'NDP') ? ndp : ulp;
     const pct = fmtPct(c.votes, total);
-    const sw = (c.swing == null || c.swing === "") ? "0.0%" : String(c.swing);
+    const sw = formatSwingDisplay(c.swing);
     const isDeclaredForParty = (info.declared?.[p] === 1 || info.declared?.[p] === '1');
     const declaredIcon = isDeclaredForParty ? `<img src="Declaration.svg" alt="Declared" class="declared-icon" />` : '';
 
     const declaredRowClass = (declaredParty === p) ? ' tt-row--declared' : '';
-    const declaredRowStyle = (declaredParty === p) ? ` style="background:${leadingColor}"` : '';
+    const declaredRowStyle = (declaredParty === p)
+  ? ` style="background:${(state.parties[p] && state.parties[p].color) || '#e9e9e9'}"`
+  : '';
 
     return `
       <div class="tt-row${declaredRowClass}"${declaredRowStyle}>
@@ -641,4 +658,5 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
+
 
