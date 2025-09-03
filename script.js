@@ -256,8 +256,9 @@ function loadSVG(svgText){
   }
   svg.removeAttribute('width');
   svg.removeAttribute('height');
-  svg.style.width = '100%';
-  svg.style.height = 'auto';
+// Let CSS control sizing
+svg.style.removeProperty('width');
+svg.style.removeProperty('height');
 
   buildDistrictTargets(svg);
   applyResults();
@@ -658,6 +659,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
+
 
 
 
