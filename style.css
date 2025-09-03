@@ -15,7 +15,7 @@ h1{font-size:20px;margin:0}
 }
 
 #svg-wrapper svg {
-  width: 67%;   /* 2/3 of original */
+  width: 50%;   /* 2/3 of original */
   height: auto;
   display: block;
 }
@@ -103,4 +103,5 @@ label{font-size:13px;color:var(--muted)}
   .pv-wrap,.seats-wrap{max-width:100%}
   .tooltip{width:min(90vw,380px)}
 }
+
 
