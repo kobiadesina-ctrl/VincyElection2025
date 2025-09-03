@@ -7,8 +7,8 @@ h1{font-size:20px;margin:0}
 .layout{display:grid;grid-template-columns:1fr 420px;gap:16px;margin-top:18px}
 #map-area{background:linear-gradient(180deg,#fff,#fbfdff);min-height:560px;border-radius:10px;padding:8px;display:flex;align-items:center;justify-content:center}
 #svg-wrapper {
-  width: 67%;
-  height: auto;
+  width: 67%%;
+  height: 67%;
   overflow: hidden;
   display: flex;              /* add this */
   justify-content: center;    /* and this, to center the map */
@@ -103,6 +103,7 @@ label{font-size:13px;color:var(--muted)}
   .pv-wrap,.seats-wrap{max-width:100%}
   .tooltip{width:min(90vw,380px)}
 }
+
 
 
 
