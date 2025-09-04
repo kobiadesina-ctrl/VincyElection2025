@@ -34,6 +34,62 @@ h1{font-size:20px;margin:0}
 .pv-seg.ndp{background:#f5c02c}
 .pv-seg.ulp{background:#ed2633}
 
+/* Row that holds left label, bar, right label */
+.pv-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* Let the bar stretch; keep the same max width behavior you already have */
+.pv-row .pv-wrap{
+  flex:1 1 auto;
+}
+
+/* Side labels with logos */
+.pv-side{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  white-space:nowrap;
+}
+.pv-logo{ width:22px; height:auto; display:block; }
+.pv-tag{ font-weight:600; font-size:13px; }
+
+/* Inside each segment: first line = swing + percent, second line = votes */
+.pv-seg{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  font-weight:600;
+  font-size:13px;
+  line-height:1.15;
+  text-align:center;
+}
+
+.pv-line{
+  display:flex;
+  align-items:center;
+  gap:6px;        /* space between swing and % */
+}
+
+.pv-swing{
+  font-size:12px;
+  font-weight:700;
+}
+.pv-swing.pos{ color:#1a7f37; }
+.pv-swing.neg{ color:#d03a3a; }
+.pv-swing.zero{ color:var(--muted); }
+
+.pv-percent{ font-size:13px; }
+
+.pv-votes{
+  font-size:11px;
+  opacity:0.95;
+}
+
+
 /* 50% vertical marker ABOVE the bar only */
 .pv-50vline{position:absolute;left:50%;width:0;bottom:40px;height:10px;border-left:2px dotted rgba(0,0,0,0.35);pointer-events:none}
 .pv-50caret{position:absolute;left:50%;transform:translateX(-50%);bottom:40px;margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1}
@@ -103,6 +159,7 @@ label{font-size:13px;color:var(--muted)}
   .pv-wrap,.seats-wrap{max-width:100%}
   .tooltip{width:min(90vw,380px)}
 }
+
 
 
 
