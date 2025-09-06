@@ -76,7 +76,7 @@ const NAME_TO_LABEL = {
   "South Central Windward": "SOUTH CENTRAL WINDWARD", "South Windward": "SOUTH WINDWARD",
   "Marriaqua": "MARRIAQUA", "East St. George": "EAST ST. GEORGE", "West St. George": "WEST ST. GEORGE",
   "East Kingstown": "EAST KINGSTOWN", "Central Kingstown": "CENTRAL KINGSTOWN", "West Kingstown": "WEST KINGSTOWN",
-  "South Leeward": "SOUTH LEEWARD", "Central Leeward": "CENTRAL LEWARD", "North Leeward": "NORTH LEEWARD",
+  "South Leeward": "SOUTH LEEWARD", "Central Leeward": "CENTRAL LEEWARD", "North Leeward": "NORTH LEEWARD",
   "Northern Grenadines": "NORTHERN GRENADINES", "Southern Grenadines": "SOUTHERN GRENADINES",
 };
 const canonicalName = raw => ID_TO_NAME[raw] || raw;
@@ -648,4 +648,5 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
+
 
