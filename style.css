@@ -144,7 +144,7 @@ h1{font-size:20px;margin:0}
 .lm-name{grid-column:1}
 .lm-swatch{width:18px;height:18px;border-radius:4px;justify-self:center}
 .ulp-declared{background:#ed2633}
-.ulp-leading{background:#fedfad}
+.ulp-leading{background:#f77e81}
 .ndp-declared{background:#f5c02c}
 .ndp-leading{background:#fedda6}
 
@@ -162,4 +162,5 @@ footer{margin-top:18px;color:#666;font-size:13px}
   .pv-row{gap:8px}
   .pv-logo{width:18px}
 }
+
 
