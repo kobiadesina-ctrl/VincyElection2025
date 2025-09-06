@@ -1,11 +1,11 @@
 /************************************************************
- * Election Map — declared-first tooltip row + bold values
- * - Declared row appears first, bolded, and filled with leading color
- * - Swing shown exactly as in results.json
- * - Two-party declaration model (declared: {NDP, ULP})
- * - Robust SVG binding + z-order hover fix
- * - Map coloring: declared colors / leading tints / tie black
- * - Popular vote stack, seat row packing (NDP left, ULP right)
+ * Election Map — full build (Sheets URL, national swing, votes under %)
+ * - Data source: Google Sheets Apps Script (RESULTS_URL)
+ * - Popular vote: [swing][percent] on first line, raw votes under
+ * - National swing: top-level { NDP: "+#.#", ULP: "-#.#" } (no "%")
+ * - Tooltip: non-swing text black; swing green/red; declared row first
+ * - Map: declared colors / leading tints / tie black
+ * - Seat row: 15 squares (NDP fill from left, ULP from right)
  * - Mobile-safe tooltip clamping; #,### number formatting
  ************************************************************/
 
@@ -15,38 +15,24 @@ const svgWrapper = qs('#svg-wrapper');
 const tooltip = qs('#tooltip');
 const fmtInt = new Intl.NumberFormat('en-US');
 
-// Normalize swing: "+#.#%" for non-negative, "-#.#%" for negative.
-// Also fixes accidental "-+..." or "++..." artifacts coming from data.
-function formatSwingDisplay(raw){
-  if (raw == null || raw === "") return "0.0%";
-  const s = String(raw).trim()
-    .replace(/^\-\+/, "-")  // "-+1.2%" -> "-1.2%"
-    .replace(/^\+\+/, "+"); // "++1.2%" -> "+1.2%"
-  const m = s.match(/^([+\-]?)(\d+(\.\d+)?)/);
-  if (!m) return s;
-  const num = parseFloat((m[1] === "-" ? "-" : "") + m[2]);
-  if (isNaN(num)) return "0.0%";
-  const sign = num < 0 ? "-" : "+";
-  return `${sign}${Math.abs(num).toFixed(1)}%`;
-}
-
 // ---------- Global state ----------
 let state = {
   parties: {
     "Unity Labour Party": { color: "#ed2633" },     // ULP declared color
     "New Democratic Party": { color: "#f5c02c" }    // NDP declared color
   },
-  leadTint: { ULP: "#f77e81", NDP: "#fedda6" },    // leading but not declared
+  leadTint: { ULP: "#fedfad", NDP: "#fedda6" },     // leading but not declared
   districts: {},
   totalSeats: 15,
-  lastUpdated: null
+  lastUpdated: null,
+  nationalSwing: { NDP: "+0.0", ULP: "+0.0" }       // no "%"
 };
 
-// Short aliases
+// short aliases
 state.parties["ULP"] = state.parties["Unity Labour Party"];
 state.parties["NDP"] = state.parties["New Democratic Party"];
 
-// ---------- Candidates ----------
+// ---------- Candidates (static) ----------
 const CANDIDATE_CONFIG = {
   "North Windward":         { NDP: "Shevern John",         ULP: "Grace Walters"      },
   "North Central Windward": { NDP: "Chieftain Neptune",    ULP: "Ralph Gonsalves"    },
@@ -70,7 +56,7 @@ function seedCandidates(){
     if(!state.districts[name]){
       state.districts[name] = {
         name,
-        declared: { NDP: 0, ULP: 0 }, // two-column model
+        declared: { NDP: 0, ULP: 0 }, // two-column declaration model
         candidates: [
           { party: "NDP", name: pair.NDP, votes: 0, swing: "0.0%" },
           { party: "ULP", name: pair.ULP, votes: 0, swing: "0.0%" },
@@ -119,7 +105,7 @@ const NAME_TO_LABEL = {
 };
 const canonicalName = raw => ID_TO_NAME[raw] || raw;
 
-// ---------- SVG district mapping ----------
+// ---------- SVG district mapping & hover ----------
 let districtTargets = new Map();
 const originalOrder = new WeakMap(); // element -> { parent, nextSibling }
 
@@ -254,11 +240,11 @@ function loadSVG(svgText){
     const h = svg.getAttribute('height');
     if(w && h) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   }
+  // leave sizing to CSS (so you can use width:67% in stylesheet)
   svg.removeAttribute('width');
   svg.removeAttribute('height');
-// Let CSS control sizing
-svg.style.removeProperty('width');
-svg.style.removeProperty('height');
+  svg.style.removeProperty('width');
+  svg.style.removeProperty('height');
 
   buildDistrictTargets(svg);
   applyResults();
@@ -286,7 +272,32 @@ function showTooltipAt(clientX, clientY){
   tooltip.style.top = top + 'px';
 }
 
-// ---------- Tooltip renderer (declared row first, bold, filled with leading color) ----------
+// ---------- Swing formatters ----------
+function formatSwingDisplay(raw){
+  // returns "+#.#%" or "-#.#%" (for per-district swings shown in tooltip)
+  if (raw == null || raw === "") return "0.0%";
+  const s = String(raw).trim().replace(/^\-\+/, "-").replace(/^\+\+/, "+");
+  const m = s.match(/^([+\-]?)(\d+(\.\d+)?)/);
+  if (!m) return s.endsWith('%') ? s : (s + '%');
+  const num = parseFloat((m[1] === "-" ? "-" : "") + m[2]);
+  if (isNaN(num)) return "0.0%";
+  const sign = num < 0 ? "-" : "+";
+  return `${sign}${Math.abs(num).toFixed(1)}%`;
+}
+
+function formatSwingNoPercent(raw){
+  // returns "+#.#" or "-#.#" (for national swing)
+  if (raw == null || raw === "") return "+0.0";
+  const s = String(raw).trim().replace(/^\-\+/, "-").replace(/^\+\+/, "+");
+  const m = s.match(/^([+\-]?)(\d+(\.\d+)?)/);
+  if (!m) return s.replace('%','');
+  const num = parseFloat((m[1] === "-" ? "-" : "") + m[2]);
+  if (isNaN(num)) return "+0.0";
+  const sign = num < 0 ? "-" : "+";
+  return `${sign}${Math.abs(num).toFixed(1)}`;
+}
+
+// ---------- Tooltip renderer ----------
 function renderTooltipFor(districtName){
   const info = state.districts[districtName] || {
     name: districtName, declared: {NDP:0,ULP:0}, candidates: [], totalVotes: 0
@@ -295,7 +306,7 @@ function renderTooltipFor(districtName){
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
 
-  // Votes to determine current leader color
+  // Votes for leader color
   const ndp = candidates.find(c=>c.party==='NDP') || { votes:0 };
   const ulp = candidates.find(c=>c.party==='ULP') || { votes:0 };
   const vN = Number(ndp.votes||0), vU = Number(ulp.votes||0);
@@ -308,21 +319,18 @@ function renderTooltipFor(districtName){
     else if (vU > vN) leadingColor = state.leadTint.ULP;
   }
 
-  // Which party (if any) is declared
+  // declared?
   const declaredN = Number(info.declared?.NDP||0) === 1;
   const declaredU = Number(info.declared?.ULP||0) === 1;
   let declaredParty = null;
   if (declaredN && !declaredU) declaredParty = 'NDP';
   else if (declaredU && !declaredN) declaredParty = 'ULP';
   else if (declaredN && declaredU) {
-    // both declared -> still bring the higher-vote first if any
     if (vN > vU) declaredParty = 'NDP';
     else if (vU > vN) declaredParty = 'ULP';
   }
 
-  // Order rows: declared party first if exists
   const order = declaredParty ? [declaredParty, declaredParty === 'NDP' ? 'ULP' : 'NDP'] : ['NDP','ULP'];
-
   const partyColor = p => (state.parties[p] && state.parties[p].color) || '#999';
   const swingClass = s => (typeof s === 'string' && s.trim().startsWith('+'))
     ? 'swing-pos' : (typeof s === 'string' && s.trim().startsWith('-')) ? 'swing-neg' : 'swing-zero';
@@ -337,8 +345,8 @@ function renderTooltipFor(districtName){
 
     const declaredRowClass = (declaredParty === p) ? ' tt-row--declared' : '';
     const declaredRowStyle = (declaredParty === p)
-  ? ` style="background:${(state.parties[p] && state.parties[p].color) || '#e9e9e9'}"`
-  : '';
+      ? ` style="background:${(state.parties[p] && state.parties[p].color) || '#e9e9e9'}"`
+      : '';
 
     return `
       <div class="tt-row${declaredRowClass}"${declaredRowStyle}>
@@ -371,7 +379,7 @@ function renderTooltipFor(districtName){
   `;
 }
 
-// ---------- Apply results to map + widgets ----------
+// ---------- Map paint + widgets ----------
 function applyResults(){
   const svg = svgWrapper.querySelector('svg');
   if(!svg) return;
@@ -401,12 +409,10 @@ function applyResults(){
       } else if (declaredU && !declaredN) {
         fillColor = state.parties['ULP']?.color || '#999';
       } else if (declaredN && declaredU) {
-        // contradictory; choose higher votes if any, else black
         if (vN > vU) fillColor = state.parties['NDP']?.color || '#999';
         else if (vU > vN) fillColor = state.parties['ULP']?.color || '#999';
         else fillColor = '#000000';
       } else {
-        // no declaration: use leading tint if any
         if (!hasVotes) fillColor = targets[0].dataset.origfill || '#d7d7d7';
         else if (vN > vU) fillColor = state.leadTint.NDP;
         else if (vU > vN) fillColor = state.leadTint.ULP;
@@ -423,7 +429,7 @@ function applyResults(){
   renderLastUpdated();
 }
 
-// ---------- Popular vote ----------
+// ---------- Popular vote (with national swing + votes under %) ----------
 function renderPopularVote(){
   const partyTotals = {};
   let totalVotes = 0;
@@ -440,22 +446,42 @@ function renderPopularVote(){
   const ndpPct = total ? (ndpVotes/total*100) : 0;
   const ulpPct = total ? (ulpVotes/total*100) : 0;
 
-  const pvBar = qs('#pv-bar'); pvBar.innerHTML = '';
+  const pvBar = qs('#pv-bar');
+  if (!pvBar) return;
+  pvBar.innerHTML = '';
+
+  const ndpSwing = state.nationalSwing?.NDP ?? "+0.0";
+  const ulpSwing = state.nationalSwing?.ULP ?? "+0.0";
+  const ndpSwingClass = ndpSwing.startsWith('-') ? 'neg' : (ndpSwing.startsWith('+') ? 'pos' : 'zero');
+  const ulpSwingClass = ulpSwing.startsWith('-') ? 'neg' : (ulpSwing.startsWith('+') ? 'pos' : 'zero');
 
   const ndpSeg = document.createElement('div');
   ndpSeg.className = 'pv-seg ndp';
   ndpSeg.style.width = ndpPct + '%';
-  ndpSeg.textContent = ndpPct.toFixed(1) + '%';
+  ndpSeg.innerHTML = `
+    <div class="pv-line">
+      <span class="pv-swing ${ndpSwingClass}">${ndpSwing}</span>
+      <span class="pv-percent">${ndpPct.toFixed(1)}%</span>
+    </div>
+    <div class="pv-votes">${fmtInt.format(ndpVotes)}</div>
+  `;
 
   const ulpSeg = document.createElement('div');
   ulpSeg.className = 'pv-seg ulp';
   ulpSeg.style.width = ulpPct + '%';
-  ulpSeg.textContent = ulpPct.toFixed(1) + '%';
+  ulpSeg.innerHTML = `
+    <div class="pv-line">
+      <span class="pv-swing ${ulpSwingClass}">${ulpSwing}</span>
+      <span class="pv-percent">${ulpPct.toFixed(1)}%</span>
+    </div>
+    <div class="pv-votes">${fmtInt.format(ulpVotes)}</div>
+  `;
 
   pvBar.appendChild(ndpSeg);
   pvBar.appendChild(ulpSeg);
 
-  qs('#pv-total').textContent = `${fmtInt.format(total || 0)} votes`;
+  const pvTotal = qs('#pv-total');
+  if (pvTotal) pvTotal.textContent = `${fmtInt.format(total || 0)} votes`;
 }
 
 // ---------- Seat row ----------
@@ -495,7 +521,7 @@ function renderSeatRow(){
       else return; // tie but not declared -> skip
     }
 
-    // tooltip lines
+    // tooltip lines for seat squares
     let tipLines = [];
     const declText = declaredN ? 'NDP' : (declaredU ? 'ULP' : null);
     if (declText && ((party==='NDP' && vN>=vU) || (party==='ULP' && vU>=vN))) {
@@ -555,7 +581,8 @@ function renderSeatRow(){
   });
 
   const declaredCount = slots.filter(s=>s && s.declared).length;
-  qs('#seat-summary').textContent = `${declaredCount} / ${TOTAL} decided`;
+  const seatSummary = qs('#seat-summary');
+  if (seatSummary) seatSummary.textContent = `${declaredCount} / ${TOTAL} decided`;
 }
 
 // ---------- Last updated ----------
@@ -574,28 +601,38 @@ function renderLastUpdated(){
   el.textContent = `Last updated: ${fmt.format(d)}`;
 }
 
-// ---------- Results polling ----------
+// ---------- Results polling (Google Sheets Apps Script URL) ----------
 const RESULTS_URL = 'https://script.google.com/macros/s/AKfycbxONF33uGiv4LVMOGkK_AdXKjCSnJvZyUH3jqeh2xzgUd7QGFahSmYB90l4k8RPYEasjw/exec';
 const POLL_MS = 7000;
 
 function mergeResults(data){
-  if(!data || !data.districts) return;
+  if(!data) return;
 
   if (data.updatedAt) state.lastUpdated = data.updatedAt;
+
+  // top-level national swing (optional; expects +#.# or -#.# strings w/o %)
+  if (data.nationalSwing) {
+    const ns = data.nationalSwing;
+    state.nationalSwing = {
+      NDP: formatSwingNoPercent(ns.NDP ?? ns.ndp ?? "+0.0"),
+      ULP: formatSwingNoPercent(ns.ULP ?? ns.ulp ?? "+0.0")
+    };
+  }
+
+  if (!data.districts) return;
 
   Object.entries(data.districts).forEach(([rawName, row])=>{
     const name = canonicalName(rawName);
     const d = state.districts[name];
     if(!d) return;
 
-    // Two-column declaration model:
+    // two-column declaration model or backward compat
     if (row.declared && typeof row.declared === 'object') {
       d.declared = {
-        NDP: Number(row.declared.NDP || 0),
-        ULP: Number(row.declared.ULP || 0)
+        NDP: Number(row.declared.NDP || row.declared.ndp || 0),
+        ULP: Number(row.declared.ULP || row.declared.ulp || 0)
       };
     } else {
-      // backward compatibility (single numeric)
       const single = Number(row.declared || 0);
       d.declared = { NDP: 0, ULP: 0 };
       if (single === 1) {
@@ -619,7 +656,7 @@ function mergeResults(data){
       const cand = (d.candidates || []).find(c=>c.party === partyKey);
       if (cand) {
         cand.votes = votes;
-        cand.swing = swingStr; // as-is from JSON
+        cand.swing = formatSwingDisplay(swingStr); // normalize "+/-#.#%"
       }
     };
 
@@ -632,7 +669,7 @@ function mergeResults(data){
 
 function startResultsPolling(){
   const tick = () => {
-    fetch(`${RESULTS_URL}?t=${Date.now()}`)
+    fetch(`${RESULTS_URL}?t=${Date.now()}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(json => {
         if (json) {
@@ -659,7 +696,3 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
-
-
-
-
