@@ -1,12 +1,10 @@
 /************************************************************
- * Election Map — full build (Sheets URL, national swing, votes under %)
- * - Data source: Google Sheets Apps Script (RESULTS_URL)
- * - Popular vote: [swing][percent] on first line, raw votes under
- * - National swing: top-level { NDP: "+#.#", ULP: "-#.#" } (no "%")
- * - Tooltip: non-swing text black; swing green/red; declared row first
- * - Map: declared colors / leading tints / tie black
- * - Seat row: 15 squares (NDP fill from left, ULP from right)
- * - Mobile-safe tooltip clamping; #,### number formatting
+ * Election Map — Sheets URL, national swing, seats under PV
+ * - Popular vote: % + swing badge (right) + votes under
+ * - National swing (no “%”) from top-level JSON
+ * - Map: declared > leading tints > tie black
+ * - Tooltip: declared row first, non-swing text black
+ * - Seat row: 15 squares (NDP left, ULP right)
  ************************************************************/
 
 // ---------- DOM helpers ----------
@@ -27,8 +25,6 @@ let state = {
   lastUpdated: null,
   nationalSwing: { NDP: "+0.0", ULP: "+0.0" }       // no "%"
 };
-
-// short aliases
 state.parties["ULP"] = state.parties["Unity Labour Party"];
 state.parties["NDP"] = state.parties["New Democratic Party"];
 
@@ -70,44 +66,24 @@ seedCandidates();
 
 // ---------- Canonical naming ----------
 const ID_TO_NAME = {
-  EG: "East St. George",
-  WG: "West St. George",
-  SG: "Southern Grenadines",
-  NG: "Northern Grenadines",
-  EK: "East Kingstown",
-  CK: "Central Kingstown",
-  WK: "West Kingstown",
-  NC: "North Central Windward",
-  NW: "North Windward",
-  SC: "South Central Windward",
-  SW: "South Windward",
-  SL: "South Leeward",
-  NL: "North Leeward",
-  CL: "Central Leeward",
-  MQ: "Marriaqua",
+  EG: "East St. George", WG: "West St. George", SG: "Southern Grenadines", NG: "Northern Grenadines",
+  EK: "East Kingstown", CK: "Central Kingstown", WK: "West Kingstown",
+  NC: "North Central Windward", NW: "North Windward", SC: "South Central Windward", SW: "South Windward",
+  SL: "South Leeward", NL: "North Leeward", CL: "Central Leeward", MQ: "Marriaqua",
 };
 const NAME_TO_LABEL = {
-  "North Windward": "NORTH WINDWARD",
-  "North Central Windward": "NORTH CENTRAL WINDWARD",
-  "South Central Windward": "SOUTH CENTRAL WINDWARD",
-  "South Windward": "SOUTH WINDWARD",
-  "Marriaqua": "MARRIAQUA",
-  "East St. George": "EAST ST. GEORGE",
-  "West St. George": "WEST ST. GEORGE",
-  "East Kingstown": "EAST KINGSTOWN",
-  "Central Kingstown": "CENTRAL KINGSTOWN",
-  "West Kingstown": "WEST KINGSTOWN",
-  "South Leeward": "SOUTH LEEWARD",
-  "Central Leeward": "CENTRAL LEEWARD",
-  "North Leeward": "NORTH LEEWARD",
-  "Northern Grenadines": "NORTHERN GRENADINES",
-  "Southern Grenadines": "SOUTHERN GRENADINES",
+  "North Windward": "NORTH WINDWARD", "North Central Windward": "NORTH CENTRAL WINDWARD",
+  "South Central Windward": "SOUTH CENTRAL WINDWARD", "South Windward": "SOUTH WINDWARD",
+  "Marriaqua": "MARRIAQUA", "East St. George": "EAST ST. GEORGE", "West St. George": "WEST ST. GEORGE",
+  "East Kingstown": "EAST KINGSTOWN", "Central Kingstown": "CENTRAL KINGSTOWN", "West Kingstown": "WEST KINGSTOWN",
+  "South Leeward": "SOUTH LEEWARD", "Central Leeward": "CENTRAL LEWARD", "North Leeward": "NORTH LEEWARD",
+  "Northern Grenadines": "NORTHERN GRENADINES", "Southern Grenadines": "SOUTHERN GRENADINES",
 };
 const canonicalName = raw => ID_TO_NAME[raw] || raw;
 
-// ---------- SVG district mapping & hover ----------
+// ---------- SVG mapping + hover ----------
 let districtTargets = new Map();
-const originalOrder = new WeakMap(); // element -> { parent, nextSibling }
+const originalOrder = new WeakMap();
 
 function isMarker(el) { return el && el.hasAttribute('id') && el.hasAttribute('data-district'); }
 function isPaintable(el) {
@@ -121,8 +97,6 @@ function attachHover(key, targets) {
     const name = canonicalName(key);
     renderTooltipFor(name);
     showTooltipAt(e.clientX, e.clientY);
-
-    // bring to front
     targets.forEach(t => {
       if (!originalOrder.has(t)) originalOrder.set(t, { parent: t.parentNode, next: t.nextSibling });
       t.parentNode.appendChild(t);
@@ -138,7 +112,6 @@ function attachHover(key, targets) {
     });
   };
   const move = e => showTooltipAt(e.clientX, e.clientY);
-
   targets.forEach(el => {
     el.style.cursor = 'pointer';
     el.addEventListener('mouseenter', enter);
@@ -240,7 +213,7 @@ function loadSVG(svgText){
     const h = svg.getAttribute('height');
     if(w && h) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   }
-  // leave sizing to CSS (so you can use width:67% in stylesheet)
+  // leave sizing to CSS
   svg.removeAttribute('width');
   svg.removeAttribute('height');
   svg.style.removeProperty('width');
@@ -250,7 +223,7 @@ function loadSVG(svgText){
   applyResults();
 }
 
-// ---------- Tooltip placement (mobile-safe clamping) ----------
+// ---------- Tooltip placement ----------
 function showTooltipAt(clientX, clientY){
   tooltip.style.display = 'block';
   const pad = 8;
@@ -274,7 +247,6 @@ function showTooltipAt(clientX, clientY){
 
 // ---------- Swing formatters ----------
 function formatSwingDisplay(raw){
-  // returns "+#.#%" or "-#.#%" (for per-district swings shown in tooltip)
   if (raw == null || raw === "") return "0.0%";
   const s = String(raw).trim().replace(/^\-\+/, "-").replace(/^\+\+/, "+");
   const m = s.match(/^([+\-]?)(\d+(\.\d+)?)/);
@@ -284,9 +256,7 @@ function formatSwingDisplay(raw){
   const sign = num < 0 ? "-" : "+";
   return `${sign}${Math.abs(num).toFixed(1)}%`;
 }
-
 function formatSwingNoPercent(raw){
-  // returns "+#.#" or "-#.#" (for national swing)
   if (raw == null || raw === "") return "+0.0";
   const s = String(raw).trim().replace(/^\-\+/, "-").replace(/^\+\+/, "+");
   const m = s.match(/^([+\-]?)(\d+(\.\d+)?)/);
@@ -297,7 +267,7 @@ function formatSwingNoPercent(raw){
   return `${sign}${Math.abs(num).toFixed(1)}`;
 }
 
-// ---------- Tooltip renderer ----------
+// ---------- Tooltip (declared row first, non-swing black) ----------
 function renderTooltipFor(districtName){
   const info = state.districts[districtName] || {
     name: districtName, declared: {NDP:0,ULP:0}, candidates: [], totalVotes: 0
@@ -306,7 +276,6 @@ function renderTooltipFor(districtName){
   const candidates = info.candidates || [];
   const total = info.totalVotes ?? candidates.reduce((s,c)=>s+(c.votes||0),0);
 
-  // Votes for leader color
   const ndp = candidates.find(c=>c.party==='NDP') || { votes:0 };
   const ulp = candidates.find(c=>c.party==='ULP') || { votes:0 };
   const vN = Number(ndp.votes||0), vU = Number(ulp.votes||0);
@@ -314,21 +283,14 @@ function renderTooltipFor(districtName){
   const isTie = hasVotes && vN === vU;
 
   let leadingColor = '#e9e9e9';
-  if (!isTie) {
-    if (vN > vU) leadingColor = state.leadTint.NDP;
-    else if (vU > vN) leadingColor = state.leadTint.ULP;
-  }
+  if (!isTie) leadingColor = (vN > vU) ? state.leadTint.NDP : state.leadTint.ULP;
 
-  // declared?
   const declaredN = Number(info.declared?.NDP||0) === 1;
   const declaredU = Number(info.declared?.ULP||0) === 1;
   let declaredParty = null;
   if (declaredN && !declaredU) declaredParty = 'NDP';
   else if (declaredU && !declaredN) declaredParty = 'ULP';
-  else if (declaredN && declaredU) {
-    if (vN > vU) declaredParty = 'NDP';
-    else if (vU > vN) declaredParty = 'ULP';
-  }
+  else if (declaredN && declaredU) declaredParty = (vN > vU) ? 'NDP' : 'ULP';
 
   const order = declaredParty ? [declaredParty, declaredParty === 'NDP' ? 'ULP' : 'NDP'] : ['NDP','ULP'];
   const partyColor = p => (state.parties[p] && state.parties[p].color) || '#999';
@@ -379,14 +341,13 @@ function renderTooltipFor(districtName){
   `;
 }
 
-// ---------- Map paint + widgets ----------
+// ---------- Apply results (map + widgets) ----------
 function applyResults(){
   const svg = svgWrapper.querySelector('svg');
   if(!svg) return;
 
   districtTargets.forEach((targets, key) => {
     if (!targets || !targets.length) return;
-
     const name = canonicalName(key);
     const info = state.districts[name];
 
@@ -403,7 +364,7 @@ function applyResults(){
       const isTie = vN === vU && hasVotes;
 
       if (isTie) {
-        fillColor = '#000000'; // tie with non-zero -> black
+        fillColor = '#000000';
       } else if (declaredN && !declaredU) {
         fillColor = state.parties['NDP']?.color || '#999';
       } else if (declaredU && !declaredN) {
@@ -417,10 +378,8 @@ function applyResults(){
         else if (vN > vU) fillColor = state.leadTint.NDP;
         else if (vU > vN) fillColor = state.leadTint.ULP;
       }
-
       info.totalVotes = vN + vU;
     }
-
     targets.forEach(el => { el.style.fill = fillColor; });
   });
 
@@ -429,7 +388,7 @@ function applyResults(){
   renderLastUpdated();
 }
 
-// ---------- Popular vote (with national swing + votes under %) ----------
+// ---------- Popular vote (badge swings right, votes under) ----------
 function renderPopularVote(){
   const partyTotals = {};
   let totalVotes = 0;
@@ -460,8 +419,8 @@ function renderPopularVote(){
   ndpSeg.style.width = ndpPct + '%';
   ndpSeg.innerHTML = `
     <div class="pv-line">
-      <span class="pv-swing ${ndpSwingClass}">${ndpSwing}</span>
       <span class="pv-percent">${ndpPct.toFixed(1)}%</span>
+      <span class="pv-swing-badge ${ndpSwingClass}">${ndpSwing}</span>
     </div>
     <div class="pv-votes">${fmtInt.format(ndpVotes)}</div>
   `;
@@ -471,8 +430,8 @@ function renderPopularVote(){
   ulpSeg.style.width = ulpPct + '%';
   ulpSeg.innerHTML = `
     <div class="pv-line">
-      <span class="pv-swing ${ulpSwingClass}">${ulpSwing}</span>
       <span class="pv-percent">${ulpPct.toFixed(1)}%</span>
+      <span class="pv-swing-badge ${ulpSwingClass}">${ulpSwing}</span>
     </div>
     <div class="pv-votes">${fmtInt.format(ulpVotes)}</div>
   `;
@@ -502,23 +461,22 @@ function renderSeatRow(){
 
     const hasVotes = (vN+vU)>0;
     const isTie = vN === vU && hasVotes;
-    if (!hasVotes) return;                          // no result -> blank
-    if (isTie && !declaredN && !declaredU) return; // tie w/o declaration -> blank
+    if (!hasVotes) return;
+    if (isTie && !declaredN && !declaredU) return;
 
     const lead = Math.abs(vN - vU);
-
-    // seat belongs to declared party if declared, else leader
     let party = null, declaredFlag=false, color;
+
     if (declaredN && !declaredU) { party='NDP'; declaredFlag=true; color=state.parties['NDP']?.color||'#999'; }
     else if (declaredU && !declaredN) { party='ULP'; declaredFlag=true; color=state.parties['ULP']?.color||'#999'; }
     else if (declaredN && declaredU) {
       if (vN > vU) { party='NDP'; declaredFlag=true; color=state.parties['NDP']?.color||'#999'; }
       else if (vU > vN) { party='ULP'; declaredFlag=true; color=state.parties['ULP']?.color||'#999'; }
-      else return; // both declared & tie -> skip
+      else return;
     } else {
       if (vN > vU) { party='NDP'; color=state.leadTint.NDP; }
       else if (vU > vN) { party='ULP'; color=state.leadTint.ULP; }
-      else return; // tie but not declared -> skip
+      else return;
     }
 
     // tooltip lines for seat squares
@@ -540,20 +498,16 @@ function renderSeatRow(){
     }
 
     const seatObj = { district: d.name || id, party, declared: declaredFlag, lead, color, tipLines };
-    if (party === 'NDP') ndpSeats.push(seatObj);
-    else ulpSeats.push(seatObj);
+    if (party === 'NDP') ndpSeats.push(seatObj); else ulpSeats.push(seatObj);
   });
 
-  // within each side: declared first, then largest lead
   ndpSeats.sort((a,b)=> (b.declared - a.declared) || (b.lead - a.lead));
   ulpSeats.sort((a,b)=> (b.declared - a.declared) || (b.lead - a.lead));
 
   const TOTAL = state.totalSeats || 15;
   const slots = new Array(TOTAL).fill(null);
 
-  // Fill from left with NDP
   for (let i=0; i<ndpSeats.length && i<TOTAL; i++) slots[i] = ndpSeats[i];
-  // Fill from right with ULP
   for (let j=0; j<ulpSeats.length && j<TOTAL; j++){
     const idx = TOTAL - 1 - j;
     if (!slots[idx]) slots[idx] = ulpSeats[j];
@@ -610,7 +564,7 @@ function mergeResults(data){
 
   if (data.updatedAt) state.lastUpdated = data.updatedAt;
 
-  // top-level national swing (optional; expects +#.# or -#.# strings w/o %)
+  // top-level national swing (optional; +#.# / -#.# w/o %)
   if (data.nationalSwing) {
     const ns = data.nationalSwing;
     state.nationalSwing = {
@@ -626,7 +580,6 @@ function mergeResults(data){
     const d = state.districts[name];
     if(!d) return;
 
-    // two-column declaration model or backward compat
     if (row.declared && typeof row.declared === 'object') {
       d.declared = {
         NDP: Number(row.declared.NDP || row.declared.ndp || 0),
@@ -656,13 +609,12 @@ function mergeResults(data){
       const cand = (d.candidates || []).find(c=>c.party === partyKey);
       if (cand) {
         cand.votes = votes;
-        cand.swing = formatSwingDisplay(swingStr); // normalize "+/-#.#%"
+        cand.swing = formatSwingDisplay(swingStr);
       }
     };
 
     setParty("NDP");
     setParty("ULP");
-
     d.totalVotes = (d.candidates||[]).reduce((s,c)=> s + (c.votes||0), 0);
   });
 }
