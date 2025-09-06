@@ -19,7 +19,7 @@ let state = {
     "Unity Labour Party": { color: "#ed2633" },     // ULP declared color
     "New Democratic Party": { color: "#f5c02c" }    // NDP declared color
   },
-  leadTint: { ULP: "#fedfad", NDP: "#fedda6" },     // leading but not declared
+  leadTint: { ULP: "#f77e81", NDP: "#fedda6" },     // leading but not declared
   districts: {},
   totalSeats: 15,
   lastUpdated: null,
@@ -648,3 +648,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
   startResultsPolling();
 });
+
