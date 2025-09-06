@@ -53,8 +53,8 @@ h1{font-size:20px;margin:0}
   gap:6px;
   white-space:nowrap;
 }
-.pv-logo{ width:22px; height:auto; display:block; }
-.pv-tag{ font-weight:600; font-size:13px; }
+.pv-logo{ width:44px; height:auto; display:block; }
+.pv-tag{ font-weight:600; font-size:30px; }
 
 /* Inside each segment: first line = swing + percent, second line = votes */
 .pv-seg{
@@ -159,6 +159,7 @@ label{font-size:13px;color:var(--muted)}
   .pv-wrap,.seats-wrap{max-width:100%}
   .tooltip{width:min(90vw,380px)}
 }
+
 
 
 
