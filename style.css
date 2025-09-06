@@ -73,8 +73,8 @@ h1{font-size:20px;margin:0}
 .pv-stack{flex:1 1 auto;display:flex;flex-direction:column;gap:10px}
 
 .pv-side{display:flex;align-items:center;gap:6px;white-space:nowrap}
-.pv-logo{width:22px;height:auto;display:block}
-.pv-tag{font-weight:700;font-size:13px}
+.pv-logo{width:50px;height:auto;display:block}
+.pv-tag{font-weight:700;font-size:30px}
 
 /* Popular vote bar */
 .pv-wrap{position:relative}
@@ -162,3 +162,4 @@ footer{margin-top:18px;color:#666;font-size:13px}
   .pv-row{gap:8px}
   .pv-logo{width:18px}
 }
+
